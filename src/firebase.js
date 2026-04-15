@@ -19,15 +19,26 @@ import { initializeApp } from "firebase/app"
 import { getDatabase, ref, get, set } from "firebase/database"
 
 // ⬇️ PASTE YOUR FIREBASE CONFIG HERE (replace the placeholder values)
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-}
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyBDgQo5CF0U5kUwk9FrV4uJEuuDP-VRXxY",
+    authDomain: "mta-election.firebaseapp.com",
+    databaseURL: "https://mta-election-default-rtdb.firebaseio.com",
+    projectId: "mta-election",
+    storageBucket: "mta-election.firebasestorage.app",
+    messagingSenderId: "577971840093",
+    appId: "1:577971840093:web:60efdd68aeabd33ccc99b4"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 
 const app = initializeApp(firebaseConfig)
 const db = getDatabase(app)
