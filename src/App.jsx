@@ -343,6 +343,7 @@ function VotePage({ctx}){
   const [step,setStep]=useState("select"),[sel,setSel]=useState(Array(CANDIDATES.length).fill(null))
   const [confirm,setConfirm]=useState(false),[localChecked,setLocalChecked]=useState([...checkedIn])
   const [receiptCode,setReceiptCode]=useState(null)
+  const [selectedVoter,setSelectedVoter]=useState(null) // tracks WHO tapped their name
   const minRank=config.minRank||2
   useEffect(()=>{setLocalChecked([...checkedIn])},[checkedIn])
 
@@ -359,7 +360,7 @@ function VotePage({ctx}){
       <div style={{fontSize:12,color:"#6b7280",marginTop:8,lineHeight:1.5}}>Write this down! Use it to verify your ballot after results.</div>
     </div>}
     <Chip color="green">{localChecked.length} of {TOTAL} recorded</Chip>
-    <div style={{marginTop:20}}><button onClick={()=>{setStep("select");setSel(Array(CANDIDATES.length).fill(null));setReceiptCode(null)}} style={{padding:"10px 22px",border:"1px solid #e5e7eb",borderRadius:9,background:"white",cursor:"pointer",fontSize:13,fontWeight:500,fontFamily:FF}}>← Back to voter list</button></div>
+    <div style={{marginTop:20}}><button onClick={()=>{setStep("select");setSel(Array(CANDIDATES.length).fill(null));setReceiptCode(null);setSelectedVoter(null)}} style={{padding:"10px 22px",border:"1px solid #e5e7eb",borderRadius:9,background:"white",cursor:"pointer",fontSize:13,fontWeight:500,fontFamily:FF}}>← Back to voter list</button></div>
   </div>)
 
   if(step==="ballot"){const rc=sel.filter(Boolean).length,ready=rc>=minRank
@@ -386,7 +387,7 @@ function VotePage({ctx}){
         <div style={{fontSize:12,color:"#9ca3af",marginBottom:14}}>{rc===0?`Rank at least ${minRank}`:rc<minRank?`${minRank-rc} more needed`:`${rc} ranked — ready!`}</div>
         <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:14}}>{ORDINALS.map((o,i)=><div key={i} style={{display:"flex",alignItems:"center",gap:5,fontSize:11,color:"#6b7280"}}><div style={{width:10,height:10,borderRadius:"50%",background:RC[i]}}/>{o}</div>)}</div>
         <Btn disabled={!ready} onClick={()=>setConfirm(true)}>Review & Cast Ballot</Btn>
-        <button onClick={()=>{setStep("select");setSel(Array(CANDIDATES.length).fill(null))}} style={{width:"100%",marginTop:8,padding:"10px",border:"1px solid #e5e7eb",borderRadius:8,background:"transparent",fontSize:13,color:"#6b7280",cursor:"pointer",fontFamily:FF}}>← Cancel</button>
+        <button onClick={()=>{setStep("select");setSel(Array(CANDIDATES.length).fill(null));setSelectedVoter(null)}} style={{width:"100%",marginTop:8,padding:"10px",border:"1px solid #e5e7eb",borderRadius:8,background:"transparent",fontSize:13,color:"#6b7280",cursor:"pointer",fontFamily:FF}}>← Cancel</button>
       </div>
       {confirm&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:999,padding:20}}>
         <div className="mta-slide" style={{background:"white",borderRadius:16,padding:28,maxWidth:380,width:"100%",textAlign:"center",fontFamily:FF}}>
@@ -401,7 +402,7 @@ function VotePage({ctx}){
           </div>
           <div style={{display:"flex",gap:10}}>
             <button onClick={()=>setConfirm(false)} style={{flex:1,padding:"12px",border:"1px solid #e5e7eb",borderRadius:9,background:"white",cursor:"pointer",fontSize:13,fontFamily:FF}}>← Edit</button>
-            <button onClick={async()=>{const code=generateReceipt();setReceiptCode(code);await addBallot({ballot:[...sel],receipt:code});await addCheckedIn("_voter_");setLocalChecked(prev=>[...prev,"_voter_"]);setConfirm(false);setStep("done")}} style={{flex:1,padding:"12px",border:"none",borderRadius:9,background:"#16a34a",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FF}}>Cast Ballot ✓</button>
+            <button onClick={async()=>{const code=generateReceipt();setReceiptCode(code);await addBallot({ballot:[...sel],receipt:code});await addCheckedIn(selectedVoter);setLocalChecked(prev=>[...prev,selectedVoter]);setConfirm(false);setStep("done")}} style={{flex:1,padding:"12px",border:"none",borderRadius:9,background:"#16a34a",color:"white",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:FF}}>Cast Ballot ✓</button>
           </div>
         </div>
       </div>}
@@ -409,7 +410,7 @@ function VotePage({ctx}){
 
   return(<div className="mta-slide" style={{fontFamily:FF}}><Card><CardH><H1>Select your name</H1><Sub>Tap to begin. ✓ = already voted.</Sub></CardH><CardB>
     <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(168px,1fr))",gap:8}}>
-      {VOTERS.map((name,i)=>{const voted=i<localChecked.length;return(<button key={name} disabled={voted} onClick={()=>setStep("ballot")} className={`mta-fade mta-d${Math.min(i%6+1,6)}`} style={{padding:"12px 14px",borderRadius:10,textAlign:"left",border:`1px solid ${voted?"#86efac":"#e5e7eb"}`,background:voted?"#f0fdf4":"white",color:voted?"#15803d":"#1f2937",fontSize:13,fontWeight:voted?600:500,cursor:voted?"not-allowed":"pointer",opacity:voted?0.75:1,transition:"all 0.15s",fontFamily:FF}}>
+      {VOTERS.map((name,i)=>{const voted=localChecked.includes(name);return(<button key={name} disabled={voted} onClick={()=>{setSelectedVoter(name);setStep("ballot")}} className={`mta-fade mta-d${Math.min(i%6+1,6)}`} style={{padding:"12px 14px",borderRadius:10,textAlign:"left",border:`1px solid ${voted?"#86efac":"#e5e7eb"}`,background:voted?"#f0fdf4":"white",color:voted?"#15803d":"#1f2937",fontSize:13,fontWeight:voted?600:500,cursor:voted?"not-allowed":"pointer",opacity:voted?0.75:1,transition:"all 0.15s",fontFamily:FF}}>
         {voted&&<span style={{display:"block",fontSize:11,color:"#16a34a",fontWeight:700,marginBottom:2}}>✓ Voted</span>}{name}
       </button>)})}
     </div>
@@ -442,8 +443,7 @@ function DemoPage(){
     const trialCandidates=genRandomNames(CANDIDATES.length)
     const b=genRand(nv,CANDIDATES.length,trialMinRank)
     const r=runSTV(b)
-    const names=genRandomNames(nv+CANDIDATES.length).slice(CANDIDATES.length)
-    const t={id:Date.now(),numVoters:nv,minRank:trialMinRank,ballots:b,results:r,voterNames:names,candidateNames:trialCandidates}
+    const t={id:Date.now(),numVoters:nv,minRank:trialMinRank,ballots:b,results:r,candidateNames:trialCandidates}
     setTrials(p=>[t,...p]);setExpanded(t.id)
   }
   return(<div className="mta-slide" style={{fontFamily:FF}}>
@@ -480,7 +480,7 @@ function DemoPage(){
           <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Winners: {t.results.elected.map(e=>t.candidateNames[e.ci].split(" ")[0]).join(" & ")}</div></div>
           <span style={{color:"#9ca3af"}}>{expanded===t.id?"▼":"▶"}</span>
         </button>
-        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo voterNames={t.voterNames} candidateNames={t.candidateNames}/></div>}
+        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo candidateNames={t.candidateNames}/></div>}
       </div>))}
       {trials.length>1&&<button onClick={()=>{setTrials([]);setExpanded(null)}} style={{marginTop:8,padding:"8px 16px",border:"1px solid #e5e7eb",borderRadius:8,background:"white",fontSize:12,color:"#6b7280",cursor:"pointer",width:"100%",fontFamily:FF}}>Clear all</button>}
     </CardB></Card>}
@@ -490,7 +490,7 @@ function DemoPage(){
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 11: STV RESULTS — shared by Demo + Admin
 // ═══════════════════════════════════════════════════════════════════════════════
-function STVResults({results,ballots,isDemo=false,level="full",voterNames=null,candidateNames=null}){
+function STVResults({results,ballots,isDemo=false,level="full",candidateNames=null}){
   // level: "winners" | "summary" | "full"
   const dq=results.quota||QUOTA,maxV=Math.max(...results.rounds.flatMap(r=>r.snapshot.map(s=>s.votes)),dq,1)
   const raw=ballots.map(b=>Array.isArray(b)?b:b.ballot),tot=raw.length
@@ -544,9 +544,9 @@ function STVResults({results,ballots,isDemo=false,level="full",voterNames=null,c
     {/* Full audit — only for "full" level */}
     {level==="full"&&<Card><CardH><H2>Human verification — all ballots</H2><Sub>Cross-check the STV count manually.</Sub></CardH><CardB>
       <div style={{padding:"12px 14px",background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:9,fontSize:13,color:"#92400e",lineHeight:1.6,marginBottom:14}}><strong>Verify:</strong> Tally all "1" circles → should match Round 1. Trace transfers through rounds.</div>
-      {disp.map((ballot,idx)=>{const ranked=ballot.map((r,ci)=>({r,ci})).filter(x=>x.r!==null).sort((a,b)=>a.r-b.r);const vName=voterNames&&voterNames[idx]?voterNames[idx]:null;return(
+      {disp.map((ballot,idx)=>{const ranked=ballot.map((r,ci)=>({r,ci})).filter(x=>x.r!==null).sort((a,b)=>a.r-b.r);return(
         <div key={idx} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"#fafaf9",borderRadius:8,marginBottom:6,border:"1px solid #e5e7eb",flexWrap:"wrap"}}>
-          <span style={{fontSize:11,fontWeight:800,color:"#9ca3af",minWidth:voterNames?100:68}}>{vName?vName.split(" ")[0]:`#${idx+1}`}</span>
+          <span style={{fontSize:11,fontWeight:800,color:"#9ca3af",minWidth:68}}>Ballot #{idx+1}</span>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ranked.map(({r,ci})=>(
             <div key={r} style={{display:"flex",alignItems:"center",gap:4,background:r<=4?RL[r-1]:"#f3f4f6",border:`1px solid ${r<=4?RC[r-1]+"44":"#d1d5db"}`,borderRadius:6,padding:"3px 9px"}}>
               <div style={{width:20,height:20,borderRadius:"50%",background:r<=4?RC[r-1]:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"white",fontWeight:800}}>{r}</div>
@@ -646,7 +646,7 @@ function AdminPage({ctx}){
     {/* Voter check-in */}
     <Card><CardH><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><H2>Voter status</H2><span style={{fontSize:12,color:"#9ca3af"}}>live</span></div></CardH><CardB>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(168px,1fr))",gap:6}}>
-        {VOTERS.map((name,i)=>{const voted=i<liveChecked.length;return(<div key={name} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:9,background:voted?"#f0fdf4":"#fafaf9",border:`1px solid ${voted?"#86efac":"#e5e7eb"}`}}>
+        {VOTERS.map((name,i)=>{const voted=liveChecked.includes(name);return(<div key={name} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:9,background:voted?"#f0fdf4":"#fafaf9",border:`1px solid ${voted?"#86efac":"#e5e7eb"}`}}>
           <div style={{width:8,height:8,borderRadius:"50%",background:voted?"#16a34a":"#d1d5db",flexShrink:0}}/><span style={{fontSize:12,color:voted?"#15803d":"#6b7280",fontWeight:voted?700:400}}>{name}</span>
         </div>)})}
       </div>
