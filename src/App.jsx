@@ -341,6 +341,12 @@ function VotePage({ctx}){
   const [confirm,setConfirm]=useState(false),[localChecked,setLocalChecked]=useState([...checkedIn])
   const [receiptCode,setReceiptCode]=useState(null)
   const [selectedVoter,setSelectedVoter]=useState(null) // tracks WHO tapped their name
+  // Randomize candidate order per voter — prevents ballot position bias
+  const [candidateOrder,setCandidateOrder]=useState(()=>{
+    const order=Array.from({length:CANDIDATES.length},(_,i)=>i)
+    for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+    return order
+  })
   const minRank=config.minRank||2
   useEffect(()=>{setLocalChecked([...checkedIn])},[checkedIn])
 
@@ -357,7 +363,13 @@ function VotePage({ctx}){
       <div style={{fontSize:12,color:"#6b7280",marginTop:8,lineHeight:1.5}}>Write this down! Use it to verify your ballot after results.</div>
     </div>}
     <Chip color="green">{localChecked.length} of {TOTAL} recorded</Chip>
-    <div style={{marginTop:20}}><button onClick={()=>{setStep("select");setSel(Array(CANDIDATES.length).fill(null));setReceiptCode(null);setSelectedVoter(null)}} style={{padding:"10px 22px",border:"1px solid #e5e7eb",borderRadius:9,background:"white",cursor:"pointer",fontSize:13,fontWeight:500,fontFamily:FF}}>← Back to voter list</button></div>
+    <div style={{marginTop:20}}><button onClick={()=>{
+      setStep("select");setSel(Array(CANDIDATES.length).fill(null));setReceiptCode(null);setSelectedVoter(null)
+      // Regenerate random candidate order for next voter
+      const order=Array.from({length:CANDIDATES.length},(_,i)=>i)
+      for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+      setCandidateOrder(order)
+    }} style={{padding:"10px 22px",border:"1px solid #e5e7eb",borderRadius:9,background:"white",cursor:"pointer",fontSize:13,fontWeight:500,fontFamily:FF}}>← Back to voter list</button></div>
   </div>)
 
   if(step==="ballot"){const rc=sel.filter(Boolean).length,ready=rc>=minRank
@@ -366,8 +378,10 @@ function VotePage({ctx}){
         🔒 <strong>Secret ballot.</strong> {minRank>=CANDIDATES.length?`Rank all ${CANDIDATES.length}.`:`Rank at least ${minRank}.`} Tap a number to rank, tap again to deselect.
       </div>
       <Card>
-        {/* Mobile-friendly: each candidate is a card with inline rank buttons */}
-        {CANDIDATES.map((name,ci)=>(<div key={ci} className={`mta-fade mta-d${ci+1}`} style={{padding:"14px 18px",borderBottom:"1px solid #f3f4f6",background:sel[ci]!==null?RL[sel[ci]-1]:"white",transition:"background 0.15s"}}>
+        {/* Mobile-friendly: each candidate is a card with inline rank buttons
+            IMPORTANT: Rendered in randomized order to prevent ballot position bias,
+            but sel[] is still indexed by the REAL candidate position for counting */}
+        {candidateOrder.map((ci,displayIdx)=>{const name=CANDIDATES[ci];return(<div key={ci} className={`mta-fade mta-d${displayIdx+1}`} style={{padding:"14px 18px",borderBottom:"1px solid #f3f4f6",background:sel[ci]!==null?RL[sel[ci]-1]:"white",transition:"background 0.15s"}}>
           <div style={{fontWeight:700,fontSize:14,color:"#1f2937",marginBottom:2}}>{name}</div>
           <div style={{fontSize:11,color:"#9ca3af",marginBottom:10}}>Co-President candidate</div>
           <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
@@ -377,7 +391,7 @@ function VotePage({ctx}){
               }}>{r}</button>)})}
             <div style={{display:"flex",alignItems:"center",gap:6,marginLeft:4}}>{ORDINALS.map((o,i)=><span key={i} style={{fontSize:10,color:RC[i],fontWeight:600}}>{i===0?"①":""}  </span>)}</div>
           </div>
-        </div>))}
+        </div>)})}
       </Card>
       <div style={{background:"white",border:"1px solid #e5e7eb",borderRadius:12,padding:"16px 18px"}}>
         <div style={{height:5,background:"#f3f4f6",borderRadius:100,marginBottom:10,overflow:"hidden"}}><div style={{height:5,borderRadius:100,transition:"width 0.3s",background:ready?"#16a34a":"#ea580c",width:`${rc/CANDIDATES.length*100}%`}}/></div>
