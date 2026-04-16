@@ -1,8 +1,6 @@
+import { sGet, sSet } from "./firebase.js"
 import { useState, useEffect, useRef } from "react"
 
-// Storage: Claude artifact uses window.storage, deployed site uses Firebase
-async function sGet(k){try{const r=await window.storage.get(k,true);return r?JSON.parse(r.value):null}catch{return null}}
-async function sSet(k,v){try{await window.storage.set(k,JSON.stringify(v),true)}catch(e){console.error(e)}}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 1: ELECTION DATA — edit these to configure your election
