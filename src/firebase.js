@@ -17,7 +17,12 @@ const db = getDatabase(app)
 export async function sGet(key) {
   try {
     const snapshot = await get(ref(db, `election/${key}`))
-    return snapshot.exists() ? snapshot.val() : null
+    if (!snapshot.exists()) return null
+    const raw = snapshot.val()
+    if (typeof raw === "string") {
+      try { return JSON.parse(raw) } catch { return raw }
+    }
+    return raw
   } catch (e) {
     console.error("Firebase read error:", e)
     return null
@@ -26,7 +31,7 @@ export async function sGet(key) {
 
 export async function sSet(key, value) {
   try {
-    await set(ref(db, `election/${key}`), value)
+    await set(ref(db, `election/${key}`), JSON.stringify(value))
   } catch (e) {
     console.error("Firebase write error:", e)
   }
