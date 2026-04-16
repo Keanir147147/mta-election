@@ -136,25 +136,202 @@ function HomePage({ctx,setTab}){
 // SECTION 8: HOW IT WORKS — includes tie-breaking + receipt info
 // ═══════════════════════════════════════════════════════════════════════════════
 function HowPage(){
-  const steps=[{n:"1",i:"✍️",t:"Rank your candidates",d:`Mark 1 for top choice, 2 for second, etc. The admin sets the minimum rankings required.`},{n:"2",i:"🎯",t:`Winning quota = ${QUOTA}`,d:`⌊${TOTAL}÷(${SEATS}+1)⌋+1 = ${QUOTA}. Hit ${QUOTA} → win a seat.`},{n:"3",i:"🔄",t:"Surplus transfers",d:`Winner's extra votes flow to next choices at reduced weight.`},{n:"4",i:"❌",t:"Weakest eliminated",d:"Nobody hit quota? Fewest votes eliminated, ballots transfer."},{n:"5",i:"⚖️",t:"Tie-breaking",d:"Ties broken by who had fewer votes in earlier rounds. If still tied: last alphabetically is eliminated. Always deterministic."},{n:"6",i:"🏆",t:"Repeat until 2 winners",d:"Steps 3–5 repeat. One ballot does all the work."}]
-  return(<div className="mta-slide"><Card><CardH><H1>How this election works</H1><Sub>RCV · STV · 2 winners from {CANDIDATES.length} candidates</Sub></CardH><CardB>
-    {steps.map((s,idx)=>(<div key={s.n} className={`mta-fade mta-d${idx+1}`} style={{display:"flex",gap:14,marginBottom:14,padding:14,background:"#fafaf9",borderRadius:10}}>
-      <div style={{width:38,height:38,borderRadius:"50%",background:"#ea580c",color:"white",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{s.n}</div>
-      <div><div style={{fontWeight:700,fontSize:14,marginBottom:4}}>{s.i} {s.t}</div><div style={{fontSize:13,color:"#6b7280",lineHeight:1.6}}>{s.d}</div></div>
-    </div>))}
-    <div style={{padding:"12px 16px",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:10,fontSize:13,color:"#1d4ed8",lineHeight:1.6,marginBottom:12}}>
-      <strong>🧾 Ballot receipt:</strong> After voting, you get a unique 6-character code. Write it down! Use it to verify your ballot after results are published.
+  const bx={borderRadius:12,padding:"16px 18px",marginBottom:14}
+  const ar={textAlign:"center",fontSize:22,color:"#ea580c",margin:"2px 0 6px",fontWeight:800}
+  const exBox={marginTop:10,background:"white",borderRadius:10,border:"1px solid #e5e7eb",padding:"12px 14px"}
+  const bar=(name,votes,max,color,won)=>(<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+    <span style={{fontSize:12,fontWeight:600,minWidth:65,color:"#374151"}}>{name}</span>
+    <div style={{flex:1,height:22,background:"#f3f4f6",borderRadius:6,position:"relative",overflow:"hidden"}}>
+      <div style={{height:"100%",background:color,borderRadius:6,width:`${votes/max*100}%`,display:"flex",alignItems:"center",justifyContent:"flex-end",paddingRight:6}}>
+        {votes>=2&&<span style={{fontSize:11,fontWeight:800,color:"white"}}>{votes}</span>}
+      </div>
     </div>
-    <div style={{padding:"12px 16px",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,fontSize:13,color:"#166534",lineHeight:1.6,marginBottom:16}}>
-      <strong>Privacy:</strong> Your name only confirms eligibility. Never stored with your vote.
-    </div>
-    <div style={{marginBottom:8,fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.1em"}}>Learn more about RCV</div>
-    {[{t:"Ranked Choice Voting Explained",c:"CGP Grey",g:"3 min",u:"https://www.youtube.com/watch?v=oHRPMJmzBBw"},{t:"How Does RCV Work?",c:"Vox",g:"4 min",u:"https://www.youtube.com/watch?v=NH3PYuOHBwk"},{t:"The Single Transferable Vote",c:"CGP Grey",g:"5 min",u:"https://www.youtube.com/watch?v=l8XOZJkozfI"}].map(v=>(
-      <a key={v.u} href={v.u} target="_blank" rel="noopener" style={{display:"flex",gap:12,alignItems:"center",padding:"12px 14px",background:"#fafaf9",borderRadius:10,border:"1px solid #e5e7eb",textDecoration:"none",color:"inherit",marginBottom:8}}>
-        <div style={{width:36,height:36,borderRadius:8,background:"#dc2626",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"white",flexShrink:0}}>▶</div>
-        <div><div style={{fontSize:13,fontWeight:600,color:"#1f2937"}}>{v.t}</div><div style={{fontSize:11,color:"#9ca3af"}}>{v.c} · <span style={{color:"#ea580c",fontWeight:600}}>{v.g}</span></div></div>
-      </a>))}
-  </CardB></Card></div>)
+    {votes<2&&<span style={{fontSize:12,fontWeight:700,color:"#374151"}}>{votes}</span>}
+    {won&&<span style={{fontSize:11,fontWeight:700,color:"#15803d",whiteSpace:"nowrap"}}>✓ WIN</span>}
+  </div>)
+
+  return(<div className="mta-slide" style={{fontFamily:FF}}>
+    {/* WHAT YOU'RE USED TO */}
+    <Card><CardH>
+      <H1>How this election works</H1>
+      <Sub>If you've only ever known "most votes wins" — this explains everything.</Sub>
+    </CardH><CardB>
+
+      <div style={{...bx,background:"#f9fafb",border:"1px solid #e5e7eb"}}>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:8,fontFamily:FH}}>What you're used to</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8,marginBottom:10}}>
+          In a normal election, everyone picks <strong>one person</strong>. Whoever gets the most votes wins. Simple.
+        </div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8}}>
+          But we're electing <strong>2 Co-Presidents</strong>, not 1. And with "just pick one," some people's votes get completely wasted — their candidate loses and their voice disappears. That's not fair.
+        </div>
+      </div>
+
+      <div style={{...bx,background:"linear-gradient(135deg,#fff7ed,#fef9c3)",border:"1px solid #fed7aa"}}>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:8,fontFamily:FH}}>What we do instead — Ranked Choice</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8}}>
+          Instead of picking just one person, you <strong>rank all the candidates in order</strong>: "I like this person most, this person second, this person third..." and so on.
+        </div>
+        <div style={{marginTop:10,display:"flex",gap:6,flexWrap:"wrap"}}>
+          {CANDIDATES.map((n,i)=>(<div key={i} style={{display:"flex",alignItems:"center",gap:6,background:"white",border:`1px solid ${RC[i]}44`,borderRadius:8,padding:"6px 12px"}}>
+            <div style={{width:24,height:24,borderRadius:"50%",background:RC[i],color:"white",fontSize:12,fontWeight:800,display:"flex",alignItems:"center",justifyContent:"center"}}>{i+1}</div>
+            <span style={{fontSize:12,fontWeight:600,color:"#374151"}}>{n.split(" ")[0]}</span>
+          </div>))}
+        </div>
+        <div style={{fontSize:12,color:"#92400e",marginTop:8}}>☝️ This is what your ballot looks like — you rank everyone 1st, 2nd, 3rd, 4th</div>
+      </div>
+
+      {/* WHY RANKING MATTERS */}
+      <div style={{...bx,background:"#eff6ff",border:"1px solid #93c5fd"}}>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:8,fontFamily:FH}}>Why does ranking matter?</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8}}>
+          Because your vote <strong>never gets wasted</strong>. If your #1 pick gets eliminated, your vote automatically moves to your #2 pick. It's like saying: "I want Veda, but if she can't win, give my vote to Sneha instead."
+        </div>
+        <div style={{fontSize:13,color:"#1d4ed8",marginTop:8,fontWeight:600}}>
+          Think of it this way: you're giving your vote a backup plan, and a backup for the backup.
+        </div>
+      </div>
+
+      {/* THE MAGIC NUMBER */}
+      <div style={{...bx,background:"#f0fdf4",border:"1px solid #86efac"}}>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:8,fontFamily:FH}}>The magic number: {QUOTA}</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8}}>
+          To win a seat, a candidate needs <strong>{QUOTA} votes out of {TOTAL}</strong>. Why {QUOTA}? Because it's mathematically impossible for 3 people to all get {QUOTA} votes (that would need {QUOTA*3} votes, but there are only {TOTAL}). So at most <strong>2 people can reach {QUOTA}</strong> — which is exactly how many Co-Presidents we're electing.
+        </div>
+        <div style={{fontSize:13,color:"#166534",marginTop:8,fontWeight:600}}>
+          It guarantees exactly 2 winners. No more, no less.
+        </div>
+      </div>
+
+      {/* STEP BY STEP EXAMPLE */}
+      <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:12,marginTop:8,fontFamily:FH}}>
+        Let's walk through an example
+      </div>
+
+      {/* STEP 1 */}
+      <div style={{...bx,background:"white",border:"2px solid #ea580c"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"#ea580c",color:"white",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>1</div>
+          <div style={{fontWeight:700,fontSize:15,color:"#1f2937"}}>Count everyone's #1 pick</div>
+        </div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7,marginBottom:8}}>
+          All {TOTAL} voters submit their ranked ballots. We look at ONLY the #1 picks first:
+        </div>
+        <div style={exBox}>
+          {bar("Veda",6,7,RC[0],true)}
+          {bar("Ananya",4,7,RC[3],false)}
+          {bar("Sneha",2,7,RC[2],false)}
+          {bar("Venkata",1,7,RC[1],false)}
+          <div style={{marginTop:8,fontSize:12,color:"#ea580c",fontWeight:600,borderTop:"1px dashed #e5e7eb",paddingTop:8}}>
+            The dashed line at {QUOTA} votes = the magic number to win
+          </div>
+        </div>
+        <div style={{marginTop:10,padding:"10px 14px",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:8,fontSize:13,color:"#166534",lineHeight:1.6}}>
+          <strong>Veda has 6!</strong> That's more than {QUOTA}, so she <strong>wins the first seat</strong> immediately.
+        </div>
+      </div>
+
+      {/* STEP 2 */}
+      <div style={ar}>⬇️</div>
+      <div style={{...bx,background:"white",border:"2px solid #7e22ce"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"#7e22ce",color:"white",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>2</div>
+          <div style={{fontWeight:700,fontSize:15,color:"#1f2937"}}>Winner's extra votes help others</div>
+        </div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7}}>
+          Veda needed {QUOTA} votes but got 6. That means <strong>1 vote is extra</strong>. Where does it go? It doesn't disappear — it flows to what Veda's voters picked as their <strong>#2 choice</strong>.
+        </div>
+        <div style={exBox}>
+          <div style={{fontSize:13,color:"#6b7280",lineHeight:1.8}}>
+            🗳️ Veda had 6 voters. She only needed 5.<br/>
+            💧 1 extra vote gets shared among their #2 picks:<br/>
+            <div style={{paddingLeft:20,marginTop:4}}>
+              → 3 voters had Sneha as #2 → Sneha gets <strong>+0.5</strong><br/>
+              → 3 voters had Ananya as #2 → Ananya gets <strong>+0.5</strong>
+            </div>
+          </div>
+        </div>
+        <div style={{marginTop:10,padding:"10px 14px",background:"#faf5ff",border:"1px solid #c084fc",borderRadius:8,fontSize:13,color:"#7e22ce",lineHeight:1.6}}>
+          <strong>Why not just +1?</strong> Because the extra vote gets split fairly among all of Veda's voters' second choices. Each voter's leftover influence is small but adds up.
+        </div>
+      </div>
+
+      {/* STEP 3 */}
+      <div style={ar}>⬇️</div>
+      <div style={{...bx,background:"white",border:"2px solid #dc2626"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"#dc2626",color:"white",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>3</div>
+          <div style={{fontWeight:700,fontSize:15,color:"#1f2937"}}>Weakest person is eliminated</div>
+        </div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7,marginBottom:8}}>
+          After the transfer, nobody else hit {QUOTA} yet. So the person with the <strong>fewest votes gets eliminated</strong>, and their voters' ballots move to their next choice.
+        </div>
+        <div style={exBox}>
+          {bar("Ananya",4.5,6,RC[3],false)}
+          {bar("Sneha",2.5,6,RC[2],false)}
+          {bar("Venkata",1,6,RC[1],false)}
+          <div style={{marginTop:6,fontSize:12,color:"#dc2626",fontWeight:600}}>❌ Venkata has fewest (1) → eliminated</div>
+          <div style={{fontSize:12,color:"#6b7280",marginTop:4}}>Venkata's voter ranked Ananya #2 → Ananya gets +1</div>
+        </div>
+      </div>
+
+      {/* STEP 4 */}
+      <div style={ar}>⬇️</div>
+      <div style={{...bx,background:"linear-gradient(135deg,#f0fdf4,#fef9c3)",border:"2px solid #86efac"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:10}}>
+          <div style={{width:36,height:36,borderRadius:"50%",background:"#15803d",color:"white",fontWeight:800,fontSize:15,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>4</div>
+          <div style={{fontWeight:700,fontSize:15,color:"#1f2937"}}>Second winner found!</div>
+        </div>
+        <div style={exBox}>
+          {bar("Ananya",5.5,6,"#16a34a",true)}
+          {bar("Sneha",2.5,6,RC[2],false)}
+          <div style={{marginTop:6,fontSize:12,color:"#15803d",fontWeight:600}}>✓ Ananya hits {QUOTA}+ → wins the second seat!</div>
+        </div>
+        <div style={{marginTop:10,textAlign:"center"}}>
+          <div style={{fontSize:28,marginBottom:6}}>🏆🏆</div>
+          <div style={{fontSize:16,fontWeight:800,color:"#1e1b4b",fontFamily:FH}}>Winners: Veda & Ananya</div>
+          <div style={{fontSize:13,color:"#6b7280",marginTop:4}}>All from one ballot. No second election needed.</div>
+        </div>
+      </div>
+
+      {/* KEY TAKEAWAYS */}
+      <div style={{...bx,background:"#fffbeb",border:"1px solid #fcd34d"}}>
+        <div style={{fontSize:15,fontWeight:800,color:"#1e1b4b",marginBottom:10,fontFamily:FH}}>Key things to remember</div>
+        <div style={{fontSize:13,color:"#92400e",lineHeight:2}}>
+          ✅ You rank candidates 1st, 2nd, 3rd, 4th — not just pick one<br/>
+          ✅ A candidate needs <strong>{QUOTA} votes</strong> to win (not just "the most")<br/>
+          ✅ If your top pick loses, your vote moves to your next pick — <strong>never wasted</strong><br/>
+          ✅ If someone wins with extra votes, those extras help other candidates<br/>
+          ✅ The person with the fewest votes gets eliminated each round<br/>
+          ✅ This continues until 2 Co-Presidents are elected
+        </div>
+      </div>
+
+      {/* WHAT IF THERE'S A TIE */}
+      <div style={{...bx,background:"#f9fafb",border:"1px solid #e5e7eb"}}>
+        <div style={{fontWeight:700,fontSize:14,color:"#1f2937",marginBottom:6}}>⚖️ What if two people are tied for last?</div>
+        <div style={{fontSize:13,color:"#6b7280",lineHeight:1.7}}>
+          The system looks back at earlier rounds — whoever had fewer votes first gets eliminated. If they were tied all the way back to Round 1, the one whose name comes last alphabetically is eliminated. The same ballots always produce the same result — no coin flips.
+        </div>
+      </div>
+
+      {/* RECEIPT */}
+      <div style={{padding:"12px 16px",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:10,fontSize:13,color:"#1d4ed8",lineHeight:1.6,marginBottom:12}}>
+        <strong>🧾 Ballot receipt:</strong> After voting, you get a 6-character code (like "K7X2M9"). Write it down or screenshot it! After results come out, you can type it in to confirm your vote was counted. Nobody else can see your code.
+      </div>
+      <div style={{padding:"12px 16px",background:"#f0fdf4",border:"1px solid #86efac",borderRadius:10,fontSize:13,color:"#166534",lineHeight:1.6,marginBottom:16}}>
+        <strong>🔒 Your vote is secret.</strong> When you tap your name, it only checks you off the list. Your actual rankings are stored separately with no connection to your name. Not even the admin can see who voted for whom.
+      </div>
+
+      {/* VIDEOS */}
+      <div style={{marginBottom:8,fontSize:11,fontWeight:700,color:"#9ca3af",textTransform:"uppercase",letterSpacing:"0.1em"}}>Still not sure? These short videos explain it perfectly</div>
+      {[{t:"Ranked Choice Voting Explained",c:"CGP Grey",g:"3 min · best intro",u:"https://www.youtube.com/watch?v=oHRPMJmzBBw"},{t:"How Does RCV Work?",c:"Vox",g:"4 min · visual",u:"https://www.youtube.com/watch?v=NH3PYuOHBwk"},{t:"The Single Transferable Vote",c:"CGP Grey",g:"5 min · multi-winner",u:"https://www.youtube.com/watch?v=l8XOZJkozfI"}].map(v=>(
+        <a key={v.u} href={v.u} target="_blank" rel="noopener" style={{display:"flex",gap:12,alignItems:"center",padding:"12px 14px",background:"#fafaf9",borderRadius:10,border:"1px solid #e5e7eb",textDecoration:"none",color:"inherit",marginBottom:8}}>
+          <div style={{width:36,height:36,borderRadius:8,background:"#dc2626",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14,color:"white",flexShrink:0}}>▶</div>
+          <div><div style={{fontSize:13,fontWeight:600,color:"#1f2937"}}>{v.t}</div><div style={{fontSize:11,color:"#9ca3af"}}>{v.c} · <span style={{color:"#ea580c",fontWeight:600}}>{v.g}</span></div></div>
+        </a>))}
+    </CardB></Card>
+  </div>)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -261,7 +438,14 @@ function genRand(nv,nc,minRank=2){const b=[];for(let v=0;v<nv;v++){const bl=Arra
 function DemoPage(){
   const [mode,setMode]=useState(null),[customN,setCustomN]=useState(50),[trials,setTrials]=useState([]),[expanded,setExpanded]=useState(null)
   const [trialMinRank,setTrialMinRank]=useState(4)
-  const run=(nv,real)=>{const b=genRand(nv,CANDIDATES.length,trialMinRank),r=runSTV(b),names=real?[...VOTERS]:genRandomNames(nv),t={id:Date.now(),numVoters:nv,minRank:trialMinRank,ballots:b,results:r,voterNames:names};setTrials(p=>[t,...p]);setExpanded(t.id)}
+  const run=(nv)=>{
+    const trialCandidates=genRandomNames(CANDIDATES.length)
+    const b=genRand(nv,CANDIDATES.length,trialMinRank)
+    const r=runSTV(b)
+    const names=genRandomNames(nv+CANDIDATES.length).slice(CANDIDATES.length)
+    const t={id:Date.now(),numVoters:nv,minRank:trialMinRank,ballots:b,results:r,voterNames:names,candidateNames:trialCandidates}
+    setTrials(p=>[t,...p]);setExpanded(t.id)
+  }
   return(<div className="mta-slide" style={{fontFamily:FF}}>
     <div style={{padding:"14px 16px",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:12,marginBottom:14,fontSize:13,color:"#1d4ed8",lineHeight:1.6}}>🧪 <strong>Trial mode.</strong> Random ballots, full STV count. No real votes affected.</div>
     <Card><CardH><H1>Choose trial type</H1></CardH><CardB>
@@ -293,10 +477,10 @@ function DemoPage(){
       {trials.map((t,idx)=>(<div key={t.id} style={{marginBottom:12}}>
         <button onClick={()=>setExpanded(expanded===t.id?null:t.id)} style={{width:"100%",padding:"12px 16px",borderRadius:10,border:`1px solid ${expanded===t.id?"#ea580c":"#e5e7eb"}`,background:expanded===t.id?"#fff7ed":"#fafaf9",cursor:"pointer",textAlign:"left",display:"flex",justifyContent:"space-between",alignItems:"center",fontFamily:FF}}>
           <div><div style={{fontSize:13,fontWeight:700}}>Trial #{trials.length-idx} · {t.numVoters}v</div>
-          <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Winners: {t.results.elected.map(e=>e.ci<CANDIDATES.length?CANDIDATES[e.ci].split(" ")[0]:`C${e.ci+1}`).join(" & ")}</div></div>
+          <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Winners: {t.results.elected.map(e=>t.candidateNames[e.ci].split(" ")[0]).join(" & ")}</div></div>
           <span style={{color:"#9ca3af"}}>{expanded===t.id?"▼":"▶"}</span>
         </button>
-        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo voterNames={t.voterNames}/></div>}
+        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo voterNames={t.voterNames} candidateNames={t.candidateNames}/></div>}
       </div>))}
       {trials.length>1&&<button onClick={()=>{setTrials([]);setExpanded(null)}} style={{marginTop:8,padding:"8px 16px",border:"1px solid #e5e7eb",borderRadius:8,background:"white",fontSize:12,color:"#6b7280",cursor:"pointer",width:"100%",fontFamily:FF}}>Clear all</button>}
     </CardB></Card>}
@@ -306,11 +490,13 @@ function DemoPage(){
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 11: STV RESULTS — shared by Demo + Admin
 // ═══════════════════════════════════════════════════════════════════════════════
-function STVResults({results,ballots,isDemo=false,level="full",voterNames=null}){
+function STVResults({results,ballots,isDemo=false,level="full",voterNames=null,candidateNames=null}){
   // level: "winners" | "summary" | "full"
   const dq=results.quota||QUOTA,maxV=Math.max(...results.rounds.flatMap(r=>r.snapshot.map(s=>s.votes)),dq,1)
   const raw=ballots.map(b=>Array.isArray(b)?b:b.ballot),tot=raw.length
-  const gn=ci=>ci<CANDIDATES.length?CANDIDATES[ci]:`Candidate ${ci+1}`,gs=ci=>ci<CANDIDATES.length?CANDIDATES[ci].split(" ")[0]:`C${ci+1}`
+  // Use custom candidate names if provided (for trials), otherwise real names
+  const cn=candidateNames||CANDIDATES
+  const gn=ci=>ci<cn.length?cn[ci]:`Candidate ${ci+1}`,gs=ci=>ci<cn.length?cn[ci].split(" ")[0]:`C${ci+1}`
   const [showMore,setShowMore]=useState(false),showAll=tot<=30,disp=showAll||showMore?raw:raw.slice(0,30)
 
   return(<div style={{fontFamily:FF}}>
@@ -551,8 +737,13 @@ function PublicResultsPage({ctx}){
 export default function App(){
   const [tab,setTab]=useState("home"),[phase,setPhase]=useState(null),[ballots,setBallots]=useState([])
   const [checkedIn,setCheckedIn]=useState([]),[config,setConfig]=useState({minRank:4}),[loading,setLoading]=useState(true)
+  const [loadError,setLoadError]=useState(false)
 
-  useEffect(()=>{(async()=>{const[p,b,c,cfg]=await Promise.all([sGet(SK.phase),sGet(SK.ballots),sGet(SK.checked),sGet(SK.config)]);setPhase(p||"setup");setBallots(b||[]);setCheckedIn(c||[]);setConfig(cfg||{minRank:4});setLoading(false)})()},[])
+  useEffect(()=>{
+    const timeout=setTimeout(()=>{setLoading(false);setLoadError(true)},10000)
+    ;(async()=>{const[p,b,c,cfg]=await Promise.all([sGet(SK.phase),sGet(SK.ballots),sGet(SK.checked),sGet(SK.config)]);clearTimeout(timeout);setPhase(p||"setup");setBallots(b||[]);setCheckedIn(c||[]);setConfig(cfg||{minRank:4});setLoading(false)})()
+    return()=>clearTimeout(timeout)
+  },[])
   useEffect(()=>{const iv=setInterval(async()=>{const[p,b,c,cfg]=await Promise.all([sGet(SK.phase),sGet(SK.ballots),sGet(SK.checked),sGet(SK.config)]);if(p)setPhase(p);if(b)setBallots(b);if(c)setCheckedIn(c);if(cfg)setConfig(cfg)},5000);return()=>clearInterval(iv)},[])
 
   const updatePhase=async np=>{await sSet(SK.phase,np);setPhase(np)}
@@ -563,6 +754,7 @@ export default function App(){
   const resetElection=async()=>{await Promise.all([sSet(SK.phase,"setup"),sSet(SK.ballots,[]),sSet(SK.checked,[]),sSet(SK.config,{minRank:4})]);setPhase("setup");setBallots([]);setCheckedIn([]);setConfig({minRank:4})}
 
   if(loading) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#fff7ed",fontFamily:FF}}><div style={{textAlign:"center"}}><MTALogo size={64}/><div style={{marginTop:16,color:"#ea580c",fontWeight:600}}>Loading...</div></div></div>
+  if(loadError&&!phase) return <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:"#fff7ed",fontFamily:FF}}><div style={{textAlign:"center",maxWidth:360,padding:20}}><MTALogo size={64}/><div style={{marginTop:16,color:"#dc2626",fontWeight:700,fontSize:16}}>Connection error</div><div style={{marginTop:8,color:"#6b7280",fontSize:13,lineHeight:1.6}}>Could not connect to the database. Check your internet connection and refresh the page.</div><button onClick={()=>window.location.reload()} style={{marginTop:16,padding:"10px 24px",background:"#ea580c",color:"white",border:"none",borderRadius:8,fontWeight:700,cursor:"pointer",fontFamily:FF}}>Refresh</button></div></div>
 
   const ctx={phase,ballots,checkedIn,config,updatePhase,updateConfig,addBallot,addCheckedIn,resetElection}
   const showTrial=phase==="setup"||phase==="revealed"
