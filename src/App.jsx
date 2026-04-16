@@ -12,7 +12,7 @@ const VOTERS = ["Navdhir Polkampalli","Praharsha Manda","Veda Vennela Thangudu",
 const TOTAL = VOTERS.length, SEATS = 2
 const QUOTA = Math.floor(TOTAL / (SEATS + 1)) + 1
 // ⬇️ CHANGE THIS to your own admin password. NOT shown anywhere in the app.
-const ADMIN_CODE = "MTA2025"
+const ADMIN_CODE = "MTA2026"
 const ORDINALS = ["1st","2nd","3rd","4th"]
 const RC = ["#c2410c","#1d4ed8","#15803d","#7e22ce"]
 const RL = ["#fff7ed","#eff6ff","#f0fdf4","#faf5ff"]
@@ -52,7 +52,10 @@ function runSTV(ballots, numC = CANDIDATES.length, seats = SEATS) {
     hist.push([...c])
     const snap=act.map(ci=>({ci,name:gn(ci),votes:+c[ci].toFixed(3)}))
     let actions=[],found=false
-    for(const ci of act){if(c[ci]>=quota&&elected.length<seats){xfer(ci,c[ci]);elected.push({ci,round:rn});actions.push({type:"elected",ci});found=true}}
+    // FIX: Sort candidates who crossed quota by MOST VOTES FIRST
+    // so the person with the most support wins, not whoever has the lowest index
+    const crossedQuota = act.filter(ci => c[ci] >= quota).sort((a,b) => c[b] - c[a])
+    for(const ci of crossedQuota){if(elected.length<seats){xfer(ci,c[ci]);elected.push({ci,round:rn});actions.push({type:"elected",ci});found=true}}
     if(!found){const mv=Math.min(...act.map(ci=>c[ci])),tied=act.filter(ci=>c[ci]===mv);let te=tied[0]
       if(tied.length>1){for(let h=hist.length-2;h>=0;h--){const pc=hist[h],pm=Math.min(...tied.map(ci=>pc[ci])),st=tied.filter(ci=>pc[ci]===pm);if(st.length<tied.length){te=st[0];break}}
         if(tied.length>1){tied.sort((a,b)=>gn(a).localeCompare(gn(b)));te=tied[tied.length-1]}}
@@ -99,7 +102,7 @@ function HomePage({ctx,setTab}){
     <div style={{background:"linear-gradient(135deg,#fff7ed 0%,#fef9c3 50%,#f0fdf4 100%)",border:"1px solid #fed7aa",borderRadius:16,padding:"28px 20px",textAlign:"center",marginBottom:16}}>
       <MTALogo size={90}/>
       <div style={{fontSize:26,fontWeight:800,color:"#1e1b4b",marginTop:14,marginBottom:4,fontFamily:FH}}>Mana Telugu Association</div>
-      <div style={{fontSize:13,color:"#92400e",fontWeight:600,letterSpacing:"0.08em",fontFamily:FF}}>PURDUE UNIVERSITY · CO-PRESIDENT ELECTION 2025</div>
+      <div style={{fontSize:13,color:"#92400e",fontWeight:600,letterSpacing:"0.08em",fontFamily:FF}}>PURDUE UNIVERSITY · CO-PRESIDENT ELECTION 2026</div>
       <div style={{marginTop:16}}><Chip color={info.c}>{info.e} {info.l}</Chip></div>
       <div style={{fontSize:13,color:"#6b7280",marginTop:10,maxWidth:360,margin:"10px auto 0",fontFamily:FF}}>{info.d}</div>
       {info.btn&&<button onClick={()=>setTab(info.t)} style={{marginTop:16,padding:"11px 28px",background:"#ea580c",color:"white",border:"none",borderRadius:100,fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:FF}}>{info.btn}</button>}
@@ -238,13 +241,27 @@ function VotePage({ctx}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SECTION 10: TRIAL PAGE
+// SECTION 10: TRIAL PAGE — with random Indian names for simulated voters
 // ═══════════════════════════════════════════════════════════════════════════════
-function genRand(nv,nc){const b=[];for(let v=0;v<nv;v++){const bl=Array(nc).fill(null);const nr=2+Math.floor(Math.random()*(nc-1));const idx=Array.from({length:nc},(_,i)=>i);for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]]}for(let r=0;r<nr;r++)bl[idx[r]]=r+1;b.push(bl)}return b}
+const FIRST_NAMES = ["Aarav","Aditi","Aisha","Akash","Amara","Anil","Anita","Arjun","Arya","Bhavya","Chandra","Deepa","Dev","Diya","Farhan","Gauri","Hari","Isha","Jay","Kavya","Kiran","Lakshmi","Manoj","Meera","Nadia","Nikhil","Nisha","Omkar","Pooja","Priya","Rahul","Ravi","Riya","Rohan","Sahana","Sanjay","Sara","Shreya","Siddharth","Simran","Sunita","Tanvi","Uma","Varun","Vimal","Yash","Zara","Neha","Vikram","Arun","Pallavi","Kunal","Divya","Harsh","Jaya","Manish","Rekha","Suresh","Tara","Vijay"]
+const LAST_NAMES = ["Acharya","Bhat","Chakraborty","Desai","Garg","Iyer","Joshi","Kapoor","Kumar","Malhotra","Menon","Nair","Patel","Pillai","Rao","Reddy","Shah","Sharma","Singh","Srinivasan","Thakur","Verma","Yadav","Banerjee","Chopra","Dutta","Ghosh","Gupta","Hegde","Jain","Kulkarni","Mehta","Mishra","Mukherjee","Pandey","Prasad","Rajan","Saxena","Sethi","Trivedi"]
+
+function genRandomNames(n) {
+  const names = new Set()
+  while (names.size < n) {
+    const f = FIRST_NAMES[Math.floor(Math.random() * FIRST_NAMES.length)]
+    const l = LAST_NAMES[Math.floor(Math.random() * LAST_NAMES.length)]
+    names.add(`${f} ${l}`)
+  }
+  return [...names]
+}
+
+function genRand(nv,nc,minRank=2){const b=[];for(let v=0;v<nv;v++){const bl=Array(nc).fill(null);const nr=minRank+Math.floor(Math.random()*(nc-minRank+1));const idx=Array.from({length:nc},(_,i)=>i);for(let i=idx.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[idx[i],idx[j]]=[idx[j],idx[i]]}for(let r=0;r<Math.min(nr,nc);r++)bl[idx[r]]=r+1;b.push(bl)}return b}
 
 function DemoPage(){
   const [mode,setMode]=useState(null),[customN,setCustomN]=useState(50),[trials,setTrials]=useState([]),[expanded,setExpanded]=useState(null)
-  const run=(nv,real)=>{const b=genRand(nv,CANDIDATES.length),r=runSTV(b),t={id:Date.now(),numVoters:nv,ballots:b,results:r};setTrials(p=>[t,...p]);setExpanded(t.id)}
+  const [trialMinRank,setTrialMinRank]=useState(4)
+  const run=(nv,real)=>{const b=genRand(nv,CANDIDATES.length,trialMinRank),r=runSTV(b),names=real?[...VOTERS]:genRandomNames(nv),t={id:Date.now(),numVoters:nv,minRank:trialMinRank,ballots:b,results:r,voterNames:names};setTrials(p=>[t,...p]);setExpanded(t.id)}
   return(<div className="mta-slide" style={{fontFamily:FF}}>
     <div style={{padding:"14px 16px",background:"#eff6ff",border:"1px solid #93c5fd",borderRadius:12,marginBottom:14,fontSize:13,color:"#1d4ed8",lineHeight:1.6}}>🧪 <strong>Trial mode.</strong> Random ballots, full STV count. No real votes affected.</div>
     <Card><CardH><H1>Choose trial type</H1></CardH><CardB>
@@ -263,6 +280,13 @@ function DemoPage(){
         </div>
         <div style={{fontSize:11,color:"#9ca3af",marginTop:6}}>Quota: {Math.floor(customN/(SEATS+1))+1}</div>
       </div>}
+      {/* Ranking limit for trial */}
+      {mode&&<div style={{marginTop:14,padding:"14px 16px",background:"#f9fafb",border:"1px solid #e5e7eb",borderRadius:10}}>
+        <div style={{fontSize:13,fontWeight:600,color:"#1f2937",marginBottom:8}}>Each simulated voter must rank:</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[2,3,4].map(n=><button key={n} onClick={()=>setTrialMinRank(n)} style={{padding:"8px 16px",borderRadius:8,border:`2px solid ${trialMinRank===n?"#ea580c":"#e5e7eb"}`,background:trialMinRank===n?"#fff7ed":"white",color:trialMinRank===n?"#ea580c":"#6b7280",fontSize:13,fontWeight:700,cursor:"pointer"}}>{n===CANDIDATES.length?`All ${n}`:`At least ${n}`}</button>)}
+        </div>
+      </div>}
       {mode&&<div style={{marginTop:14}}><Btn color={mode==="real"?"orange":"purple"} onClick={()=>run(mode==="real"?TOTAL:customN)}>Run trial →</Btn></div>}
     </CardB></Card>
     {trials.length>0&&<Card><CardH><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><H2>Trial history</H2><Chip color="purple">{trials.length}</Chip></div></CardH><CardB>
@@ -272,7 +296,7 @@ function DemoPage(){
           <div style={{fontSize:12,color:"#6b7280",marginTop:2}}>Winners: {t.results.elected.map(e=>e.ci<CANDIDATES.length?CANDIDATES[e.ci].split(" ")[0]:`C${e.ci+1}`).join(" & ")}</div></div>
           <span style={{color:"#9ca3af"}}>{expanded===t.id?"▼":"▶"}</span>
         </button>
-        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo/></div>}
+        {expanded===t.id&&<div style={{marginTop:8}}><STVResults results={t.results} ballots={t.ballots} isDemo voterNames={t.voterNames}/></div>}
       </div>))}
       {trials.length>1&&<button onClick={()=>{setTrials([]);setExpanded(null)}} style={{marginTop:8,padding:"8px 16px",border:"1px solid #e5e7eb",borderRadius:8,background:"white",fontSize:12,color:"#6b7280",cursor:"pointer",width:"100%",fontFamily:FF}}>Clear all</button>}
     </CardB></Card>}
@@ -282,7 +306,7 @@ function DemoPage(){
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 11: STV RESULTS — shared by Demo + Admin
 // ═══════════════════════════════════════════════════════════════════════════════
-function STVResults({results,ballots,isDemo=false,level="full"}){
+function STVResults({results,ballots,isDemo=false,level="full",voterNames=null}){
   // level: "winners" | "summary" | "full"
   const dq=results.quota||QUOTA,maxV=Math.max(...results.rounds.flatMap(r=>r.snapshot.map(s=>s.votes)),dq,1)
   const raw=ballots.map(b=>Array.isArray(b)?b:b.ballot),tot=raw.length
@@ -334,9 +358,9 @@ function STVResults({results,ballots,isDemo=false,level="full"}){
     {/* Full audit — only for "full" level */}
     {level==="full"&&<Card><CardH><H2>Human verification — all ballots</H2><Sub>Cross-check the STV count manually.</Sub></CardH><CardB>
       <div style={{padding:"12px 14px",background:"#fffbeb",border:"1px solid #fcd34d",borderRadius:9,fontSize:13,color:"#92400e",lineHeight:1.6,marginBottom:14}}><strong>Verify:</strong> Tally all "1" circles → should match Round 1. Trace transfers through rounds.</div>
-      {disp.map((ballot,idx)=>{const ranked=ballot.map((r,ci)=>({r,ci})).filter(x=>x.r!==null).sort((a,b)=>a.r-b.r);return(
+      {disp.map((ballot,idx)=>{const ranked=ballot.map((r,ci)=>({r,ci})).filter(x=>x.r!==null).sort((a,b)=>a.r-b.r);const vName=voterNames&&voterNames[idx]?voterNames[idx]:null;return(
         <div key={idx} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 12px",background:"#fafaf9",borderRadius:8,marginBottom:6,border:"1px solid #e5e7eb",flexWrap:"wrap"}}>
-          <span style={{fontSize:11,fontWeight:800,color:"#9ca3af",minWidth:68}}>#{idx+1}</span>
+          <span style={{fontSize:11,fontWeight:800,color:"#9ca3af",minWidth:voterNames?100:68}}>{vName?vName.split(" ")[0]:`#${idx+1}`}</span>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ranked.map(({r,ci})=>(
             <div key={r} style={{display:"flex",alignItems:"center",gap:4,background:r<=4?RL[r-1]:"#f3f4f6",border:`1px solid ${r<=4?RC[r-1]+"44":"#d1d5db"}`,borderRadius:6,padding:"3px 9px"}}>
               <div style={{width:20,height:20,borderRadius:"50%",background:r<=4?RC[r-1]:"#6b7280",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,color:"white",fontWeight:800}}>{r}</div>
@@ -374,7 +398,7 @@ function AdminPage({ctx}){
   const closeVoting=async()=>{await updatePhase("closed");setLivePhase("closed")}
   const revealResults=async()=>{const cfg={...localConfig,releaseLevel};await updateConfig(cfg);await updatePhase("revealed");setLivePhase("revealed");setResults(runSTV(liveBallots))}
   const doReset=async()=>{await resetElection();setResults(null);setResetConfirm(false);setLivePhase("setup");setLiveBallots([]);setLiveChecked([]);setLocalConfig({minRank:4});setVerifyResult(null);setReleaseLevel("full")}
-  const exportBallots=()=>{const raw=liveBallots.map(b=>Array.isArray(b)?b:b.ballot);const data={election:"MTA Co-President Election 2025",exportedAt:new Date().toISOString(),totalVoters:TOTAL,totalBallots:raw.length,candidates:CANDIDATES,seats:SEATS,quota:QUOTA,phase:livePhase,ballots:raw,receipts:liveBallots.map(b=>Array.isArray(b)?null:b.receipt).filter(Boolean)};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`mta-election-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url)}
+  const exportBallots=()=>{const raw=liveBallots.map(b=>Array.isArray(b)?b:b.ballot);const data={election:"MTA Co-President Election 2026",exportedAt:new Date().toISOString(),totalVoters:TOTAL,totalBallots:raw.length,candidates:CANDIDATES,seats:SEATS,quota:QUOTA,phase:livePhase,ballots:raw,receipts:liveBallots.map(b=>Array.isArray(b)?null:b.receipt).filter(Boolean)};const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`mta-election-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url)}
   const lookupReceipt=()=>{const code=verifyCode.trim().toUpperCase();if(code.length!==6){setVerifyResult("not_found");return};const found=liveBallots.find(b=>!Array.isArray(b)&&b.receipt===code);setVerifyResult(found||"not_found")}
 
   const vc=liveBallots.length,allV=vc===TOTAL
@@ -554,7 +578,7 @@ export default function App(){
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",height:56}}>
           <div style={{display:"flex",alignItems:"center",gap:10}}>
             <MTALogo size={38}/>
-            <div><div style={{fontSize:13,fontWeight:800,color:"#1e1b4b",lineHeight:1.2,fontFamily:FH}}><span style={{color:"#ea580c"}}>MTA</span> Election 2025</div><div style={{fontSize:10,color:"#9ca3af"}}>Mana Telugu Association · Purdue</div></div>
+            <div><div style={{fontSize:13,fontWeight:800,color:"#1e1b4b",lineHeight:1.2,fontFamily:FH}}><span style={{color:"#ea580c"}}>MTA</span> Election 2026</div><div style={{fontSize:10,color:"#9ca3af"}}>Mana Telugu Association · Purdue</div></div>
           </div>
           <div style={{fontSize:11,fontWeight:700,padding:"4px 10px",borderRadius:100,background:`${phaseColor}18`,color:phaseColor,border:`1px solid ${phaseColor}44`}}>{phaseLabel}</div>
         </div>
