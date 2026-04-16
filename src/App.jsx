@@ -1,6 +1,7 @@
 import { sGet, sSet } from "./firebase.js"
 import { useState, useEffect, useRef } from "react"
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // SECTION 1: ELECTION DATA — edit these to configure your election
 // ═══════════════════════════════════════════════════════════════════════════════
