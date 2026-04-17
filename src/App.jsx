@@ -1787,12 +1787,19 @@ export default function App() {
   const [receipts, setReceipts] = useState([])
   const [release, setRelease] = useState("winners")
   const [loading, setLoading] = useState(true)
+  // Admin unlock persists across refreshes via sessionStorage — survives
+  // reload, but auto-clears when the tab/browser closes. That way the admin
+  // can hit refresh while testing without re-typing the code, but anyone
+  // who opens the site fresh in a new browser still has to authenticate.
   const [adminUnlocked, setAdminUnlockedRaw] = useState(() => {
-    try { return sessionStorage.getItem("mta25_admin") === "1" } catch { return false }
+    try { return sessionStorage.getItem("mta25_admin_unlocked") === "1" } catch { return false }
   })
-  const setAdminUnlocked = (val) => {
-    try { sessionStorage.setItem("mta25_admin", val ? "1" : "0") } catch {}
-    setAdminUnlockedRaw(val)
+  const setAdminUnlocked = (value) => {
+    setAdminUnlockedRaw(value)
+    try {
+      if (value) sessionStorage.setItem("mta25_admin_unlocked", "1")
+      else sessionStorage.removeItem("mta25_admin_unlocked")
+    } catch {}
   }
   // Dark mode — pref stored in localStorage if available, else in-memory
   const [dark, setDark] = useState(() => {
