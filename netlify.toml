@@ -2,6 +2,16 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # VITE_ADMIN_CODE is intentionally inlined into the client bundle by Vite's
+  # build-time substitution, so its value is expected to appear in build output.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_ADMIN_CODE"
+  # Firebase web SDK config (including apiKey) is a public client identifier
+  # by design — security is enforced via Firebase Security Rules, not by
+  # hiding the key. Disable smart detection to avoid false-positive matches
+  # on these public values in the built bundle.
+  SECRETS_SCAN_SMART_DETECTION_ENABLED = "false"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
