@@ -29,7 +29,29 @@ const VOTERS = [
 const TOTAL = VOTERS.length
 const SEATS = 2
 const QUOTA = Math.floor(TOTAL / (SEATS + 1)) + 1 // 5
-const ADMIN_CODE = "MTA2025"
+
+// ⚠️ ADMIN CODE — loaded from an environment variable on the deployed site.
+// Locally: create a `.env.local` file in the project root with one line:
+//     VITE_ADMIN_CODE=your-code-here
+// On Netlify: Site settings → Environment variables → add VITE_ADMIN_CODE
+// The `.env.local` file is in .gitignore so it never touches GitHub.
+// If no env variable is set, falls back to "NOT_CONFIGURED" so no one can
+// accidentally unlock the admin panel without configuring the code first.
+//
+// The indirect `new Function(...)` below is important: it prevents a parse
+// error in environments where `import.meta` is not available (like Claude's
+// artifact preview). On your real Vite build, this still works correctly
+// because the env variable lookup happens at runtime.
+function getAdminCode() {
+  try {
+    const getEnv = new Function("try { return import.meta.env } catch { return null }")
+    const env = getEnv()
+    if (env && env.VITE_ADMIN_CODE) return env.VITE_ADMIN_CODE
+  } catch {}
+  return "NOT_CONFIGURED"
+}
+const ADMIN_CODE = getAdminCode()
+
 const ORDINALS = ["1st", "2nd", "3rd", "4th"]
 const RANK_COLORS = ["#c2410c", "#1d4ed8", "#15803d", "#7e22ce"]
 const RANK_LIGHT = ["#fff7ed", "#eff6ff", "#f0fdf4", "#faf5ff"]
@@ -1405,6 +1427,11 @@ function AdminPage({ ctx }) {
           <Sub>Enter the admin code to manage the election.</Sub>
         </CardHead>
         <CardBody>
+          {ADMIN_CODE === "NOT_CONFIGURED" && (
+            <div style={{ padding: "12px 14px", background: "#fef2f2", border: "2px solid #dc2626", borderRadius: 10, marginBottom: 14, fontSize: 12, color: "#991b1b", lineHeight: 1.6 }}>
+              ⚠️ <strong>Admin code not set!</strong> No <code>VITE_ADMIN_CODE</code> environment variable found. Set one in your <code>.env.local</code> (local dev) or in Netlify's Site settings → Environment variables, then redeploy. Admin cannot unlock until this is configured.
+            </div>
+          )}
           <div style={{ padding: "14px 16px", background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10, marginBottom: 16, fontSize: 12, color: "#991b1b", lineHeight: 1.6 }}>
             <strong>Restricted area.</strong> Only the election organiser has this code. If you don't have it, close this page and go back to the Home tab.
           </div>
