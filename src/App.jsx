@@ -30,27 +30,23 @@ const TOTAL = VOTERS.length
 const SEATS = 2
 const QUOTA = Math.floor(TOTAL / (SEATS + 1)) + 1 // 5
 
-// ⚠️ ADMIN CODE — loaded from an environment variable on the deployed site.
-// Locally: create a `.env.local` file in the project root with one line:
-//     VITE_ADMIN_CODE=your-code-here
-// On Netlify: Site settings → Environment variables → add VITE_ADMIN_CODE
-// The `.env.local` file is in .gitignore so it never touches GitHub.
-// If no env variable is set, falls back to "NOT_CONFIGURED" so no one can
-// accidentally unlock the admin panel without configuring the code first.
+// ⚠️ ADMIN CODE — loaded from an environment variable at build time.
 //
-// The indirect `new Function(...)` below is important: it prevents a parse
-// error in environments where `import.meta` is not available (like Claude's
-// artifact preview). On your real Vite build, this still works correctly
-// because the env variable lookup happens at runtime.
-function getAdminCode() {
-  try {
-    const getEnv = new Function("try { return import.meta.env } catch { return null }")
-    const env = getEnv()
-    if (env && env.VITE_ADMIN_CODE) return env.VITE_ADMIN_CODE
-  } catch {}
-  return "NOT_CONFIGURED"
-}
-const ADMIN_CODE = getAdminCode()
+// On Netlify: Site configuration → Environment variables → VITE_ADMIN_CODE
+// Locally: create `.env.local` in project root with:  VITE_ADMIN_CODE=your-code
+// The `.env.local` file is in .gitignore so it never touches GitHub.
+//
+// NOTE: we reference `import.meta.env.VITE_ADMIN_CODE` DIRECTLY (not wrapped
+// in `new Function`) because Vite performs a build-time string substitution
+// pass — it literally finds the text `import.meta.env.VITE_ADMIN_CODE` in
+// source and replaces it with the actual value. Any indirection (Function
+// constructor, dynamic property access, etc.) breaks that substitution and
+// the value ends up undefined at runtime.
+//
+// This means the code will NOT work in Claude's artifact preview — that's
+// fine, we're testing on Netlify now. If you ever need to open it in the
+// preview again, temporarily change this to a hardcoded string.
+const ADMIN_CODE = import.meta.env.VITE_ADMIN_CODE || "NOT_CONFIGURED"
 
 const ORDINALS = ["1st", "2nd", "3rd", "4th"]
 const RANK_COLORS = ["#c2410c", "#1d4ed8", "#15803d", "#7e22ce"]
