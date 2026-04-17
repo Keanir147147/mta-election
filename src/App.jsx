@@ -1348,13 +1348,7 @@ function AdminPage({ ctx }) {
   // you don't have to re-enable it every time you open the admin panel.
   // TURN THIS OFF BEFORE THE REAL ELECTION so you get your backup files.
   const [testMode, setTestMode] = useState(() => {
-    try {
-      const stored = localStorage.getItem("mta25_testmode")
-      // Default to TRUE — test mode is ON until you explicitly turn it off.
-      // This prevents surprise file downloads during setup/testing.
-      // TURN IT OFF before election day to enable auto-backups.
-      return stored === null ? true : stored === "1"
-    } catch { return true }
+    try { return localStorage.getItem("mta25_testmode") === "1" } catch { return false }
   })
   const toggleTestMode = () => {
     setTestMode(prev => {
@@ -1521,8 +1515,8 @@ function AdminPage({ ctx }) {
               <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 14 }}>
                 {allVoted ? "All votes in — ready to close and reveal!" : `${voteCount} of ${TOTAL} votes received. Waiting for ${TOTAL - voteCount} more.`}
               </div>
-              <Btn onClick={closeVoting} color="orange" disabled={!allVoted && !testMode}>
-                {allVoted ? "Close Voting & Prepare Results" : testMode ? `Close Voting (test mode — ${voteCount}/${TOTAL} votes)` : `Waiting for ${TOTAL - voteCount} more voter${TOTAL - voteCount === 1 ? "" : "s"}...`}
+              <Btn onClick={closeVoting} color="orange" disabled={!allVoted}>
+                {allVoted ? "Close Voting & Prepare Results" : `Waiting for ${TOTAL - voteCount} more voter${TOTAL - voteCount === 1 ? "" : "s"}...`}
               </Btn>
             </>
           )}
@@ -1551,22 +1545,22 @@ function AdminPage({ ctx }) {
                 <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.5, marginTop: 2 }}>
                   {testMode
                     ? "Auto-backup files WILL NOT download on phase changes. Use this while testing."
-                    : "Auto-backup JSON files will download automatically when you open, close, or reveal voting. ✅ Recommended for election day."}
+                    : "Auto-backup JSON files will download automatically when you open, close, or reveal voting."}
                 </div>
               </div>
             </label>
             {testMode && (
               <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 600, marginTop: 6, paddingTop: 6, borderTop: "1px dashed #93c5fd" }}>
-                ⚠️ Test mode is ON by default. Turn it <strong>OFF</strong> before the real election to enable auto-backup downloads.
+                ⚠️ Remember to turn this OFF before the real election so you get your backup files.
               </div>
             )}
-            {testMode && (
+            {testMode && livePhase !== "setup" && (
               <button onClick={doReset} style={{
                 marginTop: 10, width: "100%", padding: "9px 14px", borderRadius: 8,
                 border: "1px solid #93c5fd", background: "white", color: "#1d4ed8",
                 fontSize: 12, fontWeight: 700, cursor: "pointer",
               }}>
-                ↺ Reset entire election to setup (test mode)
+                ↺ Reset to setup (test mode only)
               </button>
             )}
           </div>
@@ -1793,7 +1787,13 @@ export default function App() {
   const [receipts, setReceipts] = useState([])
   const [release, setRelease] = useState("winners")
   const [loading, setLoading] = useState(true)
-  const [adminUnlocked, setAdminUnlocked] = useState(false)
+  const [adminUnlocked, setAdminUnlockedRaw] = useState(() => {
+    try { return sessionStorage.getItem("mta25_admin") === "1" } catch { return false }
+  })
+  const setAdminUnlocked = (val) => {
+    try { sessionStorage.setItem("mta25_admin", val ? "1" : "0") } catch {}
+    setAdminUnlockedRaw(val)
+  }
   // Dark mode — pref stored in localStorage if available, else in-memory
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem("mta25_dark") === "1" } catch { return false }
