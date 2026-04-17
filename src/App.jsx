@@ -252,6 +252,25 @@ function PinInput({ value, onChange, placeholder = "Enter code", onEnter }) {
 // ─────────────────────────────────────────────────────────────────────────────
 function HomePage({ ctx, setTab }) {
   const { phase, ballots, checkedIn } = ctx
+  const [showQR, setShowQR] = useState(false)
+  // Build the share URL from whatever host the app is running on — works
+  // on Netlify, custom domains, localhost, anywhere.
+  const shareUrl = typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""
+  // Use the free public QR API. No library dependency, works offline-ish
+  // (as long as the voter has internet, which they need anyway to vote).
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=12&data=${encodeURIComponent(shareUrl)}`
+  const copyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      alert("Link copied to clipboard!")
+    } catch {
+      // Fallback for older browsers
+      const ta = document.createElement("textarea")
+      ta.value = shareUrl; document.body.appendChild(ta); ta.select()
+      document.execCommand("copy"); document.body.removeChild(ta)
+      alert("Link copied!")
+    }
+  }
   const phaseInfo = {
     setup: { emoji: "🔒", label: "Election Not Started", desc: "The admin needs to unlock voting using the admin code before anyone can cast a ballot.", color: "gray", btnLabel: "Go to Admin →", btnTab: "admin" },
     open: { emoji: "🗳️", label: "Voting is Open!", desc: "All eligible members can now cast their secret ballot. Select your name and rank your candidates.", color: "green", btnLabel: "Vote Now →", btnTab: "vote" },
@@ -274,6 +293,13 @@ function HomePage({ ctx, setTab }) {
           <button onClick={() => setTab(info.btnTab)} style={{ marginTop: 16, padding: "11px 28px", background: "#ea580c", color: "white", border: "none", borderRadius: 100, fontWeight: 700, fontSize: 14, cursor: "pointer" }}>
             {info.btnLabel}
           </button>
+        )}
+        {(phase === "setup" || phase === "open") && (
+          <div style={{ marginTop: 10 }}>
+            <button onClick={() => setShowQR(true)} style={{ padding: "8px 20px", background: "white", color: "#ea580c", border: "1.5px solid #fed7aa", borderRadius: 100, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              📱 Share link · QR code
+            </button>
+          </div>
         )}
       </div>
 
@@ -334,6 +360,30 @@ function HomePage({ ctx, setTab }) {
       <div style={{ padding: "14px 16px", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 12, fontSize: 13, color: "#92400e", lineHeight: 1.7 }}>
         <strong>Voting method:</strong> Ranked Choice Voting (Single Transferable Vote). You rank candidates 1–4. The two winners are whoever reaches {QUOTA} votes first, with transfers ensuring every vote counts.
       </div>
+
+      {/* QR share modal */}
+      {showQR && (
+        <div onClick={() => setShowQR(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="mta-keep-color" style={{ background: "white", borderRadius: 16, padding: 28, maxWidth: 380, width: "100%", textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: "#1e1b4b", marginBottom: 4 }}>Share this election</div>
+            <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 18 }}>Scan with any phone camera to open the ballot.</div>
+            <div style={{ padding: 12, background: "#fafaf9", borderRadius: 12, border: "1px solid #e5e7eb", marginBottom: 14 }}>
+              <img src={qrSrc} alt="QR code for ballot link" style={{ width: "100%", maxWidth: 260, height: "auto", display: "block", margin: "0 auto" }} />
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>Direct link</div>
+            <div style={{ fontSize: 12, fontFamily: "monospace", background: "#fafaf9", padding: "8px 12px", borderRadius: 8, marginBottom: 14, wordBreak: "break-all", color: "#1f2937" }}>{shareUrl}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={copyLink} style={{ flex: 1, padding: "11px", border: "none", borderRadius: 9, background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                📋 Copy link
+              </button>
+              <button onClick={() => setShowQR(false)} style={{ flex: 1, padding: "11px", border: "1px solid #e5e7eb", borderRadius: 9, background: "white", fontSize: 13, fontWeight: 600, cursor: "pointer", color: "#6b7280" }}>
+                Close
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 12 }}>Tip: hold your laptop up so multiple people can scan at once.</div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1293,11 +1343,54 @@ function AdminPage({ ctx }) {
     else { setPinErr(true) }
   }
 
-  const openVoting = async () => { await updatePhase("open"); setLivePhase("open") }
-  const closeVoting = async () => { await updatePhase("closed"); setLivePhase("closed") }
+  // Auto-backup: silently downloads a timestamped JSON snapshot every time
+  // the admin advances a phase (open/closed/revealed). This means the admin
+  // ends up with at least 3 backup files on their computer without having to
+  // remember to click anything. If Firebase ever loses data, these files are
+  // the recovery path. Called inside each phase-change handler below.
+  const autoBackup = (phaseTag) => {
+    try {
+      const now = new Date()
+      const stamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19) // 2026-04-16T23-45-12
+      const payload = {
+        backupType: "auto",
+        phaseAtBackup: phaseTag,
+        exportedAt: now.toISOString(),
+        election: "MTA Co-President 2026",
+        totalVoters: TOTAL,
+        seats: SEATS,
+        quota: QUOTA,
+        candidates: CANDIDATES,
+        ballotCount: liveBallots.length,
+        ballots: liveBallots,
+        receipts: liveReceipts,
+        checkedInCount: liveChecked.length,
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `mta-auto-backup-${phaseTag}-${stamp}.json`
+      document.body.appendChild(a); a.click(); document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      // Auto-backup failures should never block a phase change — just log.
+      console.warn("Auto-backup failed:", e)
+    }
+  }
+
+  const openVoting = async () => {
+    await updatePhase("open"); setLivePhase("open")
+    autoBackup("opened") // snapshot at the moment voting opens (usually 0 ballots)
+  }
+  const closeVoting = async () => {
+    await updatePhase("closed"); setLivePhase("closed")
+    autoBackup("closed") // snapshot with ALL ballots right before results are tallied
+  }
   const revealResults = async () => {
     await updatePhase("revealed"); setLivePhase("revealed")
     setResults(runSTV(liveBallots))
+    autoBackup("revealed") // snapshot at reveal time — the authoritative record
   }
   const doReset = async () => { await resetElection(); setResults(null); setResetConfirm(false); setLivePhase("setup"); setLiveBallots([]); setLiveChecked([]) }
 
@@ -1399,6 +1492,11 @@ function AdminPage({ ctx }) {
             </div>
           )}
 
+          {/* Auto-backup notice — always shown so admin isn't surprised */}
+          <div style={{ marginTop: 8, padding: "10px 14px", background: "#fafaf9", border: "1px dashed #d1d5db", borderRadius: 9, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
+            💾 <strong>Auto-backup:</strong> a timestamped JSON file will be downloaded to your device automatically when voting opens, closes, and results are revealed. Keep those files — they're your offline recovery if Firebase ever has an issue. You can also download on-demand below.
+          </div>
+
           {/* Release level — only when closed or revealed */}
           {(livePhase === "closed" || livePhase === "revealed") && (
             <div style={{ marginTop: 8, padding: "14px 16px", background: "#faf5ff", border: "1px solid #d8b4fe", borderRadius: 10 }}>
@@ -1467,32 +1565,124 @@ function AdminPage({ ctx }) {
           </CardHead>
           <CardBody>
             <div style={{ fontSize: 13, color: "#6b7280", lineHeight: 1.6, marginBottom: 14 }}>
-              This creates a <code style={{ background: "#f3f4f6", padding: "2px 6px", borderRadius: 4, fontSize: 12 }}>.json</code> file with every ballot, the candidate list, the Droop quota, and receipt codes. If storage ever fails, you can manually verify the tally from this file.
+              This creates a downloadable file with every ballot, the candidate list, the Droop quota, and receipt codes. Pick the format you want. All three formats contain the same data — pick whichever opens in the tool you prefer.
             </div>
-            <button onClick={() => {
-              const payload = {
-                exportedAt: new Date().toISOString(),
-                election: "MTA Co-President 2026",
-                totalVoters: TOTAL,
-                seats: SEATS,
-                quota: QUOTA,
-                candidates: CANDIDATES,
-                ballotCount: liveBallots.length,
-                ballots: liveBallots, // no voter names — ballots are shuffled
-                receipts: liveReceipts,
+
+            {(() => {
+              const today = new Date().toISOString().slice(0, 10)
+              const base = `mta-election-ballots-${today}`
+
+              const downloadBlob = (content, mime, ext) => {
+                const blob = new Blob([content], { type: mime })
+                const url = URL.createObjectURL(blob)
+                const a = document.createElement("a")
+                a.href = url
+                a.download = `${base}.${ext}`
+                document.body.appendChild(a); a.click(); document.body.removeChild(a)
+                URL.revokeObjectURL(url)
               }
-              const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" })
-              const url = URL.createObjectURL(blob)
-              const a = document.createElement("a")
-              a.href = url
-              a.download = `mta-election-ballots-${new Date().toISOString().slice(0, 10)}.json`
-              document.body.appendChild(a); a.click(); document.body.removeChild(a)
-              URL.revokeObjectURL(url)
-            }} style={{ padding: "11px 20px", border: "none", borderRadius: 9, background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              ⬇ Download ballots (.json)
-            </button>
+
+              const exportJSON = () => {
+                const payload = {
+                  exportedAt: new Date().toISOString(),
+                  election: "MTA Co-President 2026",
+                  totalVoters: TOTAL,
+                  seats: SEATS,
+                  quota: QUOTA,
+                  candidates: CANDIDATES,
+                  ballotCount: liveBallots.length,
+                  ballots: liveBallots,
+                  receipts: liveReceipts,
+                }
+                downloadBlob(JSON.stringify(payload, null, 2), "application/json", "json")
+              }
+
+              const exportCSV = () => {
+                // Columns: Ballot#, Receipt, then one column per candidate's rank
+                const header = ["Ballot", "Receipt", ...CANDIDATES.map(c => `"${c.replace(/"/g, '""')}"`)].join(",")
+                const rows = liveBallots.map((ballot, i) => {
+                  const receipt = liveReceipts[i] || ""
+                  const ranks = ballot.map(r => r === null || r === undefined ? "" : r).join(",")
+                  return `${i + 1},${receipt},${ranks}`
+                })
+                const meta = [
+                  `# MTA Co-President Election 2026`,
+                  `# Exported: ${new Date().toISOString()}`,
+                  `# Ballots: ${liveBallots.length} of ${TOTAL}`,
+                  `# Quota: ${QUOTA} · Seats: ${SEATS}`,
+                  `# Rank 1 = first choice, blank = not ranked`,
+                ].join("\n")
+                downloadBlob(`${meta}\n${header}\n${rows.join("\n")}`, "text/csv", "csv")
+              }
+
+              const exportTXT = () => {
+                // Human-readable audit report — printable, signable
+                const lines = [
+                  "=" .repeat(64),
+                  "   MTA CO-PRESIDENT ELECTION 2026 — BALLOT AUDIT REPORT",
+                  "   Mana Telugu Association · Purdue University",
+                  "=" .repeat(64),
+                  "",
+                  `Exported:       ${new Date().toString()}`,
+                  `Total voters:   ${TOTAL}`,
+                  `Seats:          ${SEATS}`,
+                  `Droop quota:    ${QUOTA}  (= floor(${TOTAL} / ${SEATS + 1}) + 1)`,
+                  `Ballots cast:   ${liveBallots.length}`,
+                  `Candidates:`,
+                  ...CANDIDATES.map((c, i) => `  [${i}] ${c}`),
+                  "",
+                  "-" .repeat(64),
+                  "INDIVIDUAL BALLOTS (anonymized — no voter names)",
+                  "-" .repeat(64),
+                  "",
+                  ...liveBallots.map((ballot, i) => {
+                    const receipt = liveReceipts[i] || "n/a"
+                    const ranked = ballot
+                      .map((r, ci) => ({ r, ci }))
+                      .filter(x => x.r !== null && x.r !== undefined)
+                      .sort((a, b) => a.r - b.r)
+                      .map(x => `${x.r}: ${CANDIDATES[x.ci]}`)
+                      .join(" | ")
+                    return `Ballot #${String(i + 1).padStart(3, "0")}  [${receipt}]  ${ranked}`
+                  }),
+                  "",
+                  "-" .repeat(64),
+                  "VERIFIER CHECKLIST",
+                  "-" .repeat(64),
+                  "",
+                  `[ ] Total ballots count = ${liveBallots.length}`,
+                  `[ ] Every ballot has at least 2 rankings`,
+                  `[ ] No ballot assigns the same rank to two candidates`,
+                  `[ ] Round 1 first-choice totals sum to ${liveBallots.length}`,
+                  `[ ] Surplus above ${QUOTA} redistributes proportionally`,
+                  `[ ] Elimination = lowest vote-getter each round`,
+                  `[ ] Exactly ${SEATS} candidates elected`,
+                  "",
+                  "Verified by: _________________________   Date: ____________",
+                  "",
+                  "=" .repeat(64),
+                  "END OF REPORT",
+                  "=" .repeat(64),
+                ]
+                downloadBlob(lines.join("\n"), "text/plain", "txt")
+              }
+
+              return (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={exportJSON} style={{ padding: "10px 16px", border: "none", borderRadius: 9, background: "#1d4ed8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                    ⬇ JSON (raw data)
+                  </button>
+                  <button onClick={exportCSV} style={{ padding: "10px 16px", border: "none", borderRadius: 9, background: "#15803d", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                    ⬇ CSV (Excel / Sheets)
+                  </button>
+                  <button onClick={exportTXT} style={{ padding: "10px 16px", border: "none", borderRadius: 9, background: "#6b21a8", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+                    ⬇ TXT (printable audit)
+                  </button>
+                </div>
+              )
+            })()}
             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 10 }}>
-              {liveBallots.length} ballot{liveBallots.length === 1 ? "" : "s"} · {liveReceipts.length} receipt code{liveReceipts.length === 1 ? "" : "s"}
+              {liveBallots.length} ballot{liveBallots.length === 1 ? "" : "s"} · {liveReceipts.length} receipt code{liveReceipts.length === 1 ? "" : "s"} · Names of voters are NOT included in any export.
             </div>
           </CardBody>
         </Card>
