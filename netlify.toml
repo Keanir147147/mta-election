@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # VITE_ADMIN_CODE is intentionally inlined into the client bundle — it
+  # gates the admin UI, not real secrets. Exclude it from the scanner so
+  # deploys aren't blocked. See src/App.jsx for the design rationale.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_ADMIN_CODE"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
