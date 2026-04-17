@@ -1342,6 +1342,21 @@ function AdminPage({ ctx }) {
   const [liveReceipts, setLiveReceipts] = useState([...receipts])
   const [liveRelease, setLiveRelease] = useState(release)
   const [livePhase, setLivePhase] = useState(phase)
+  // Test mode: when ON, auto-backup downloads are disabled. Useful for
+  // testing — you don't want 20 JSON files cluttering your Downloads folder
+  // while you click through phases. The setting persists in localStorage so
+  // you don't have to re-enable it every time you open the admin panel.
+  // TURN THIS OFF BEFORE THE REAL ELECTION so you get your backup files.
+  const [testMode, setTestMode] = useState(() => {
+    try { return localStorage.getItem("mta25_testmode") === "1" } catch { return false }
+  })
+  const toggleTestMode = () => {
+    setTestMode(prev => {
+      const next = !prev
+      try { localStorage.setItem("mta25_testmode", next ? "1" : "0") } catch {}
+      return next
+    })
+  }
 
   useEffect(() => { setLiveChecked([...checkedIn]); setLiveBallots([...ballots]); setLiveReceipts([...receipts]); setLiveRelease(release); setLivePhase(phase) }, [checkedIn, ballots, receipts, release, phase])
   useEffect(() => {
@@ -1367,6 +1382,10 @@ function AdminPage({ ctx }) {
   // remember to click anything. If Firebase ever loses data, these files are
   // the recovery path. Called inside each phase-change handler below.
   const autoBackup = (phaseTag) => {
+    if (testMode) {
+      console.info(`[test mode] auto-backup skipped for phase: ${phaseTag}`)
+      return
+    }
     try {
       const now = new Date()
       const stamp = now.toISOString().replace(/[:.]/g, "-").slice(0, 19) // 2026-04-16T23-45-12
@@ -1410,7 +1429,7 @@ function AdminPage({ ctx }) {
     setResults(runSTV(liveBallots))
     autoBackup("revealed") // snapshot at reveal time — the authoritative record
   }
-  const doReset = async () => { await resetElection(); setResults(null); setResetConfirm(false); setLivePhase("setup"); setLiveBallots([]); setLiveChecked([]) }
+  const doReset = async () => { await resetElection(); setResults(null); setResetConfirm(false); setLivePhase("setup"); setLiveBallots([]); setLiveChecked([]); setLiveReceipts([]) }
 
   const voteCount = liveBallots.length
   const allVoted = voteCount === TOTAL
@@ -1515,9 +1534,35 @@ function AdminPage({ ctx }) {
             </div>
           )}
 
-          {/* Auto-backup notice — always shown so admin isn't surprised */}
-          <div style={{ marginTop: 8, padding: "10px 14px", background: "#fafaf9", border: "1px dashed #d1d5db", borderRadius: 9, fontSize: 12, color: "#6b7280", lineHeight: 1.6 }}>
-            💾 <strong>Auto-backup:</strong> a timestamped JSON file will be downloaded to your device automatically when voting opens, closes, and results are revealed. Keep those files — they're your offline recovery if Firebase ever has an issue. You can also download on-demand below.
+          {/* Test mode + auto-backup toggle */}
+          <div style={{ marginTop: 8, padding: "12px 14px", background: testMode ? "#eff6ff" : "#fafaf9", border: `1px solid ${testMode ? "#93c5fd" : "#d1d5db"}`, borderRadius: 9 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: testMode ? 6 : 0 }}>
+              <input type="checkbox" checked={testMode} onChange={toggleTestMode} style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: testMode ? "#1d4ed8" : "#1f2937" }}>
+                  🧪 Test mode {testMode ? "ON" : "OFF"}
+                </div>
+                <div style={{ fontSize: 11, color: "#6b7280", lineHeight: 1.5, marginTop: 2 }}>
+                  {testMode
+                    ? "Auto-backup files WILL NOT download on phase changes. Use this while testing."
+                    : "Auto-backup JSON files will download automatically when you open, close, or reveal voting."}
+                </div>
+              </div>
+            </label>
+            {testMode && (
+              <div style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 600, marginTop: 6, paddingTop: 6, borderTop: "1px dashed #93c5fd" }}>
+                ⚠️ Remember to turn this OFF before the real election so you get your backup files.
+              </div>
+            )}
+            {testMode && livePhase !== "setup" && (
+              <button onClick={doReset} style={{
+                marginTop: 10, width: "100%", padding: "9px 14px", borderRadius: 8,
+                border: "1px solid #93c5fd", background: "white", color: "#1d4ed8",
+                fontSize: 12, fontWeight: 700, cursor: "pointer",
+              }}>
+                ↺ Reset to setup (test mode only)
+              </button>
+            )}
           </div>
 
           {/* Release level — only when closed or revealed */}
