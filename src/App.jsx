@@ -186,12 +186,12 @@ function runSTV(ballots, candidates = CANDIDATES) {
 // SHARED STORAGE
 // ─────────────────────────────────────────────────────────────────────────────
 const SK = { phase: "mta25_phase", ballots: "mta25_ballots", checked: "mta25_checked", receipts: "mta25_receipts", release: "mta25_release" }
-async function sGet(k) {
-  try { const r = await window.storage.get(k, true); return r ? JSON.parse(r.value) : null } catch { return null }
-}
-async function sSet(k, v) {
-  try { await window.storage.set(k, JSON.stringify(v), true) } catch(e) { console.error(e) }
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// SHARED STORAGE
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MTA LOGO — real logo embedded as base64...
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MTA LOGO — real logo embedded as base64 so it works offline and on any host
