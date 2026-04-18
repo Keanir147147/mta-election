@@ -1786,16 +1786,9 @@ export default function App() {
   // reload, but auto-clears when the tab/browser closes. That way the admin
   // can hit refresh while testing without re-typing the code, but anyone
   // who opens the site fresh in a new browser still has to authenticate.
-  const [adminUnlocked, setAdminUnlockedRaw] = useState(() => {
-    try { return sessionStorage.getItem("mta25_admin_unlocked") === "1" } catch { return false }
-  })
-  const setAdminUnlocked = (value) => {
-    setAdminUnlockedRaw(value)
-    try {
-      if (value) sessionStorage.setItem("mta25_admin_unlocked", "1")
-      else sessionStorage.removeItem("mta25_admin_unlocked")
-    } catch {}
-  }
+  // Admin unlock uses plain React state — persists across tab navigation
+   // but clears on page refresh. User has to re-type code after refresh.
+   const [adminUnlocked, setAdminUnlocked] = useState(false)
   // Dark mode — pref stored in localStorage if available, else in-memory
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem("mta25_dark") === "1" } catch { return false }
