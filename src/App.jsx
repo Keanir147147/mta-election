@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { sGet, sSet } from "./firebase.js"
+import { sGet, sSet, castBallotAtomic } from "./firebase.js"
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1826,28 +1826,16 @@ export default function App() {
 
   // Atomic ballot cast — reads latest server state, checks double-vote, shuffles in,
   // stores receipt-code+ballot mapping (the mapping has NO voter name).
-  const castBallot = async (ballot, voterName, receiptCode) => {
-    try {
-      const [latestB, latestC, latestR] = await Promise.all([sGet(SK.ballots), sGet(SK.checked), sGet(SK.receipts)])
-      const curB = latestB || [], curC = latestC || [], curR = latestR || []
-      if (curC.includes(voterName)) return false // already voted
-
-      // SHUFFLE: insert the new ballot at a random position so submission order
-      // doesn't reveal which voter cast which ballot.
-      const insertAt = Math.floor(Math.random() * (curB.length + 1))
-      const newBallots = [...curB.slice(0, insertAt), ballot, ...curB.slice(insertAt)]
-      const newChecked = [...curC, voterName]
-      // Receipt stored with ballot (NOT voter name). Same shuffle index.
-      const newReceipts = [...curR.slice(0, insertAt), receiptCode, ...curR.slice(insertAt)]
-
-      await Promise.all([
-        sSet(SK.ballots, newBallots),
-        sSet(SK.checked, newChecked),
-        sSet(SK.receipts, newReceipts),
-      ])
-      setBallots(newBallots); setCheckedIn(newChecked); setReceipts(newReceipts)
-      return true
-    } catch (e) { console.error(e); return false }
+const castBallot = async (ballot, voterName, receiptCode) => {
+    // Uses a Firebase transaction so concurrent voters can never overwrite
+    // each other's ballots. If two voters submit at the exact same moment,
+    // Firebase serializes the writes and retries — both ballots land.
+    const result = await castBallotAtomic(voterName, ballot, receiptCode)
+    if (!result.success) return false
+    // Refresh local state from server so the UI updates immediately.
+    const [b, c, r] = await Promise.all([sGet(SK.ballots), sGet(SK.checked), sGet(SK.receipts)])
+    if (b) setBallots(b); if (c) setCheckedIn(c); if (r) setReceipts(r)
+    return true
   }
 
   const resetElection = async () => {
