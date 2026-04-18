@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react"
-import { sGet, sSet, castBallotAtomic } from "./firebase.js"
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DATA
 // ─────────────────────────────────────────────────────────────────────────────
@@ -186,7 +186,12 @@ function runSTV(ballots, candidates = CANDIDATES) {
 // SHARED STORAGE
 // ─────────────────────────────────────────────────────────────────────────────
 const SK = { phase: "mta25_phase", ballots: "mta25_ballots", checked: "mta25_checked", receipts: "mta25_receipts", release: "mta25_release" }
-
+async function sGet(k) {
+  try { const r = await window.storage.get(k, true); return r ? JSON.parse(r.value) : null } catch { return null }
+}
+async function sSet(k, v) {
+  try { await window.storage.set(k, JSON.stringify(v), true) } catch(e) { console.error(e) }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MTA LOGO — real logo embedded as base64 so it works offline and on any host
@@ -1518,9 +1523,8 @@ function AdminPage({ ctx }) {
           {livePhase === "closed" && (
             <>
               <div style={{ padding: "14px 16px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 10, marginBottom: 14, fontSize: 13, color: "#166534", lineHeight: 1.6 }}>
-                <strong>All {voteCount} votes received.</strong> When everyone is ready, click below to run the STV count and reveal the winners.
+                <strong>All {voteCount} votes received.</strong> Scroll down to review the ballots before revealing results. The reveal button lives in the "Pre-reveal ballot review" section below.
               </div>
-              <Btn onClick={revealResults} color="green">Reveal Results & Run Tally 🏆</Btn>
             </>
           )}
           {livePhase === "revealed" && (
@@ -1611,6 +1615,67 @@ function AdminPage({ ctx }) {
           </div>
         </CardBody>
       </Card>
+
+      {/* Pre-reveal ballot review — appears after voting closes, BEFORE
+          reveal. Lets the admin inspect anonymized ballots (and cross-check
+          against physical/paper records if any exist) before committing to
+          reveal. Reveal button is moved here so it's gated behind this step. */}
+      {livePhase === "closed" && (
+        <Card>
+          <CardHead>
+            <H2>Pre-reveal ballot review</H2>
+            <Sub>Inspect every anonymous ballot below BEFORE revealing results. This is your chance to catch anomalies.</Sub>
+          </CardHead>
+          <CardBody>
+            <div style={{ padding: "12px 14px", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 9, fontSize: 13, color: "#92400e", lineHeight: 1.6, marginBottom: 14 }}>
+              <strong>What to check here:</strong> confirm the total ballot count matches who signed in, spot-check that the rankings look plausible (not all identical, not obviously tampered), and if you kept any physical backup record, cross-reference it now. Once you hit "Reveal Results" below, the count runs and becomes the official record.
+            </div>
+
+            {liveBallots.map((ballot, idx) => {
+              const ranked = ballot.map((r, ci) => ({ r, ci })).filter(x => x.r !== null).sort((a, b) => a.r - b.r)
+              return (
+                <div key={idx} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#fafaf9", borderRadius: 8, marginBottom: 6, border: "1px solid #e5e7eb", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: "#9ca3af", minWidth: 68 }}>Ballot #{idx + 1}</span>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {ranked.map(({ r, ci }) => (
+                      <div key={r} style={{ display: "flex", alignItems: "center", gap: 4, background: RANK_LIGHT[r-1], border: `1px solid ${RANK_COLORS[r-1]}44`, borderRadius: 6, padding: "3px 9px" }}>
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: RANK_COLORS[r-1], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "white", fontWeight: 800, flexShrink: 0 }}>{r}</div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{shortName(CANDIDATES[ci])}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Pre-reveal checklist — different from post-reveal one. These
+                are checks you can make WITHOUT knowing the winners. */}
+            <div style={{ marginTop: 14, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+              <div style={{ padding: "10px 14px", background: "#fafaf9", borderBottom: "1px solid #e5e7eb", fontWeight: 700, fontSize: 13 }}>Pre-reveal checklist</div>
+              {[
+                `Total ballot count = ${liveBallots.length} of ${TOTAL} expected`,
+                `Every ballot has at least 2 rankings`,
+                `No ballot assigns the same rank twice`,
+                `If paper backups exist: ballot rankings here match them`,
+                `Ballot ordering looks random (i.e. not all identical, no obvious pattern of tampering)`,
+                `I have downloaded a backup file already (JSON/CSV) for offline safekeeping`,
+              ].map((item, i) => (
+                <label key={i} style={{ display: "flex", alignItems: "flex-start", gap: 10, padding: "9px 14px", borderBottom: "1px solid #f3f4f6", fontSize: 13, cursor: "pointer" }}>
+                  <input type="checkbox" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <span style={{ color: "#6b7280" }}>{item}</span>
+                </label>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 16, padding: "12px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 9, fontSize: 13, color: "#166534", lineHeight: 1.6 }}>
+              <strong>When ready to reveal:</strong> click below to run the STV count and publish results. This is irreversible in practice — once results are out, people will have seen them.
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <Btn onClick={revealResults} color="green">Reveal Results & Run Tally 🏆</Btn>
+            </div>
+          </CardBody>
+        </Card>
+      )}
 
       {/* Results */}
       {livePhase === "revealed" && (results ? <STVResults results={results} ballots={liveBallots} /> : (
@@ -1782,13 +1847,12 @@ export default function App() {
   const [receipts, setReceipts] = useState([])
   const [release, setRelease] = useState("winners")
   const [loading, setLoading] = useState(true)
-  // Admin unlock persists across refreshes via sessionStorage — survives
-  // reload, but auto-clears when the tab/browser closes. That way the admin
-  // can hit refresh while testing without re-typing the code, but anyone
-  // who opens the site fresh in a new browser still has to authenticate.
-  // Admin unlock uses plain React state — persists across tab navigation
-   // but clears on page refresh. User has to re-type code after refresh.
-   const [adminUnlocked, setAdminUnlocked] = useState(false)
+  // Admin unlock uses plain React state — it persists while navigating
+  // between tabs (Home/Vote/Admin/etc) within the same page load, but
+  // clears automatically on any full page refresh. This is the desired
+  // behavior: admin doesn't have to re-type the code when moving around
+  // the app, but a refresh (or closing the tab) requires re-authentication.
+  const [adminUnlocked, setAdminUnlocked] = useState(false)
   // Dark mode — pref stored in localStorage if available, else in-memory
   const [dark, setDark] = useState(() => {
     try { return localStorage.getItem("mta25_dark") === "1" } catch { return false }
@@ -1812,6 +1876,10 @@ export default function App() {
       setLoading(false)
     }
     load()
+    // Clean up stale sessionStorage from previous builds — this key used to
+    // persist admin unlock across refreshes, but we intentionally removed
+    // that behavior. If any user has it left over, clear it now.
+    try { sessionStorage.removeItem("mta25_admin_unlocked") } catch {}
   }, [])
 
   useEffect(() => {
@@ -1826,16 +1894,28 @@ export default function App() {
 
   // Atomic ballot cast — reads latest server state, checks double-vote, shuffles in,
   // stores receipt-code+ballot mapping (the mapping has NO voter name).
-const castBallot = async (ballot, voterName, receiptCode) => {
-    // Uses a Firebase transaction so concurrent voters can never overwrite
-    // each other's ballots. If two voters submit at the exact same moment,
-    // Firebase serializes the writes and retries — both ballots land.
-    const result = await castBallotAtomic(voterName, ballot, receiptCode)
-    if (!result.success) return false
-    // Refresh local state from server so the UI updates immediately.
-    const [b, c, r] = await Promise.all([sGet(SK.ballots), sGet(SK.checked), sGet(SK.receipts)])
-    if (b) setBallots(b); if (c) setCheckedIn(c); if (r) setReceipts(r)
-    return true
+  const castBallot = async (ballot, voterName, receiptCode) => {
+    try {
+      const [latestB, latestC, latestR] = await Promise.all([sGet(SK.ballots), sGet(SK.checked), sGet(SK.receipts)])
+      const curB = latestB || [], curC = latestC || [], curR = latestR || []
+      if (curC.includes(voterName)) return false // already voted
+
+      // SHUFFLE: insert the new ballot at a random position so submission order
+      // doesn't reveal which voter cast which ballot.
+      const insertAt = Math.floor(Math.random() * (curB.length + 1))
+      const newBallots = [...curB.slice(0, insertAt), ballot, ...curB.slice(insertAt)]
+      const newChecked = [...curC, voterName]
+      // Receipt stored with ballot (NOT voter name). Same shuffle index.
+      const newReceipts = [...curR.slice(0, insertAt), receiptCode, ...curR.slice(insertAt)]
+
+      await Promise.all([
+        sSet(SK.ballots, newBallots),
+        sSet(SK.checked, newChecked),
+        sSet(SK.receipts, newReceipts),
+      ])
+      setBallots(newBallots); setCheckedIn(newChecked); setReceipts(newReceipts)
+      return true
+    } catch (e) { console.error(e); return false }
   }
 
   const resetElection = async () => {
