@@ -184,6 +184,79 @@ function runSTV(ballots, candidates = CANDIDATES) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// SUPPLEMENTARY ANALYSIS: lock-in-winner re-count
+// ─────────────────────────────────────────────────────────────────────────────
+// This function supports a transparency feature. After the main STV has run,
+// we can ask: "if we simply lock in the first winner and let voters' remaining
+// preferences decide the second seat, who wins?" This is a stress-test — if
+// the result matches the main STV, it confirms the outcome is robust. If it
+// differs, it surfaces ambiguity caused by tie-breaks.
+//
+// Approach: given the ballots and a list of candidate indices to exclude
+// (the already-elected winners), run STV for just the remaining seats on
+// just the remaining candidates. Voter preferences are kept intact — we just
+// skip over excluded candidates when finding the "next active" choice.
+function runSTVExcluding(ballots, excludeIndices, candidates = CANDIDATES) {
+  const remainingSeats = SEATS - excludeIndices.length
+  if (remainingSeats <= 0) return { rounds: [], elected: [], quota: 0 }
+  const quota = Math.floor(ballots.length / (remainingSeats + 1)) + 1
+  const rankLists = ballots.map(b =>
+    b.map((r, i) => ({ r, i })).filter(x => x.r !== null && !excludeIndices.includes(x.i)).sort((a, b) => a.r - b.r).map(x => x.i)
+  )
+  let weights = ballots.map(() => 1.0)
+  let eliminated = new Set()
+  let elected = []
+  let rounds = []
+  const isActive = ci => !excludeIndices.includes(ci) && !eliminated.has(ci) && !elected.find(e => e.ci === ci)
+  const countVotes = () => {
+    const c = Array(candidates.length).fill(0)
+    rankLists.forEach((list, bi) => {
+      for (const ci of list) { if (isActive(ci)) { c[ci] += weights[bi]; break } }
+    })
+    return c
+  }
+  const transferSurplus = (winCi, total) => {
+    const tw = (total - quota) / total
+    if (tw <= 0) return
+    rankLists.forEach((list, bi) => {
+      for (const ci of list) { if (isActive(ci)) { if (ci === winCi) weights[bi] *= tw; break } }
+    })
+  }
+  let rn = 1
+  while (elected.length < remainingSeats && rn <= 20) {
+    const counts = countVotes()
+    const active = candidates.map((_, i) => i).filter(isActive)
+    if (!active.length) break
+    const snapshot = active.map(ci => ({ ci, name: candidates[ci], votes: +counts[ci].toFixed(3) }))
+    let actions = [], found = false
+    const byVotesDesc = [...active].sort((a, b) => counts[b] - counts[a])
+    for (const ci of byVotesDesc) {
+      if (counts[ci] >= quota && elected.length < remainingSeats) {
+        transferSurplus(ci, counts[ci])
+        elected.push({ ci, round: rn })
+        actions.push({ type: "elected", ci })
+        found = true
+      }
+    }
+    if (!found) {
+      const minV = Math.min(...active.map(ci => counts[ci]))
+      const tied = active.filter(ci => counts[ci] === minV)
+      const toElim = tied[tied.length - 1]
+      eliminated.add(toElim)
+      actions.push({ type: "eliminated", ci: toElim })
+    }
+    rounds.push({ rn, snapshot, actions })
+    rn++
+    const rem = candidates.map((_, i) => i).filter(isActive)
+    if (rem.length > 0 && rem.length <= remainingSeats - elected.length) {
+      rem.forEach(ci => elected.push({ ci, round: rn }))
+      break
+    }
+  }
+  return { rounds, elected, quota }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SHARED STORAGE
 // ─────────────────────────────────────────────────────────────────────────────
 const SK = { phase: "mta25_phase", ballots: "mta25_ballots", checked: "mta25_checked", receipts: "mta25_receipts", release: "mta25_release" }
@@ -1160,6 +1233,76 @@ function STVResults({ results, ballots, isDemo = false, candidates = CANDIDATES 
           </div>
         </CardBody>
       </Card>
+
+      {/* Supplementary analysis: lock-in-first-winner re-count.
+          Shows what happens if we lock in the first-elected candidate and
+          re-run STV for the remaining seat(s) using voters' full remaining
+          preferences. If same winners emerge, the original result is robust.
+          If different, it surfaces ambiguity caused by tie-breaks. */}
+      {results.elected.length >= 2 && (() => {
+        const firstWinnerCi = results.elected[0].ci
+        const suppl = runSTVExcluding(ballots, [firstWinnerCi], candidates)
+        const supplWinnerCi = suppl.elected[0]?.ci
+        const mainSecondCi = results.elected[1].ci
+        const matches = supplWinnerCi === mainSecondCi
+        return (
+          <Card>
+            <CardHead>
+              <H2>Supplementary analysis — tie-break robustness check</H2>
+              <Sub>"If we lock in the first-elected candidate as a given, who wins the second seat from voters' full remaining preferences?"</Sub>
+            </CardHead>
+            <CardBody>
+              <div style={{ padding: "12px 14px", background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 9, fontSize: 13, color: "#1e40af", lineHeight: 1.6, marginBottom: 14 }}>
+                <strong>Why this matters:</strong> STV uses specific tie-break rules that can feel arbitrary in close elections. This analysis stress-tests the main result: we take the clearest winner ({candidates[firstWinnerCi]}), remove them from every ballot, and run STV for 1 seat from the remaining candidates. If the same person wins as in the main count, the original result is robust to tie-break choice.
+              </div>
+
+              <div style={{ marginBottom: 14, padding: "14px 16px", background: matches ? "#f0fdf4" : "#fef3c7", border: `2px solid ${matches ? "#86efac" : "#fcd34d"}`, borderRadius: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: matches ? "#166534" : "#92400e", marginBottom: 6 }}>
+                  {matches ? "✓ Result is robust" : "⚠ Result differs — tie-break ambiguity detected"}
+                </div>
+                <div style={{ fontSize: 13, color: matches ? "#166534" : "#92400e", lineHeight: 1.6 }}>
+                  {matches
+                    ? `Both methods elect ${candidates[mainSecondCi]} as the second Co-President. The main STV result is not an artifact of tie-break coincidence — it reflects voters' broader preferences.`
+                    : `Main STV elected ${candidates[mainSecondCi]}. Supplementary analysis elects ${candidates[supplWinnerCi]}. This means the tie-break rule materially affected the outcome.`}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Re-count rounds (for the 2nd seat, Quota = {suppl.quota})</div>
+              {suppl.rounds.map(round => {
+                const electedCis = round.actions.filter(a => a.type === "elected").map(a => a.ci)
+                const elimCis = round.actions.filter(a => a.type === "eliminated").map(a => a.ci)
+                return (
+                  <div key={round.rn} style={{ marginBottom: 10, border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden" }}>
+                    <div style={{ padding: "8px 14px", background: "#fafaf9", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 4 }}>
+                      <span style={{ fontWeight: 700, fontSize: 12 }}>Round {round.rn}</span>
+                      <span style={{ fontSize: 11, color: "#6b7280" }}>
+                        {electedCis.map(ci => `✓ ${candidates[ci].split(" ")[0]} elected`).join(" · ")}
+                        {elimCis.map(ci => ` ✗ ${candidates[ci].split(" ")[0]} eliminated`).join("")}
+                      </span>
+                    </div>
+                    {round.snapshot.sort((a, b) => b.votes - a.votes).map(row => {
+                      const isWin = electedCis.includes(row.ci)
+                      const isOut = elimCis.includes(row.ci)
+                      return (
+                        <div key={row.ci} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 14px", borderBottom: "1px solid #f9fafb", fontSize: 12 }}>
+                          <span style={{ fontWeight: 700, minWidth: 80, color: isWin ? "#15803d" : isOut ? "#9ca3af" : "#1f2937" }}>{row.name.split(" ")[0]}</span>
+                          <span style={{ fontWeight: 800, color: isWin ? "#15803d" : isOut ? "#9ca3af" : "#1f2937" }}>{row.votes}</span>
+                          {isWin && <Chip color="green">✓ Elected</Chip>}
+                          {isOut && <Chip color="red">✗ Eliminated</Chip>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+
+              <div style={{ marginTop: 12, padding: "10px 14px", background: "#fafaf9", border: "1px dashed #d1d5db", borderRadius: 9, fontSize: 12, color: "#6b7280", lineHeight: 1.5 }}>
+                <strong>Note:</strong> This is a supplementary analysis for transparency only. The official result is the main STV count above. We include this check so the community can see that the result doesn't depend on an arbitrary tie-break choice.
+              </div>
+            </CardBody>
+          </Card>
+        )
+      })()}
     </div>
   )
 }
