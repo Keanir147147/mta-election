@@ -1331,6 +1331,10 @@ function AdminPage({ ctx }) {
   const [pin, setPin] = useState("")
   const [pinErr, setPinErr] = useState(false)
   const [results, setResults] = useState(null)
+  // previewMode: admin can calculate results BEFORE revealing them publicly.
+  // When true, STVResults render in the admin panel for the admin only —
+  // the public phase is still "closed" and voters don't see results yet.
+  const [previewMode, setPreviewMode] = useState(false)
   const [resetConfirm, setResetConfirm] = useState(false)
   const [liveChecked, setLiveChecked] = useState([...checkedIn])
   const [liveBallots, setLiveBallots] = useState([...ballots])
@@ -1662,14 +1666,37 @@ function AdminPage({ ctx }) {
               ))}
             </div>
 
-            <div style={{ marginTop: 16, padding: "12px 14px", background: "#f0fdf4", border: "1px solid #86efac", borderRadius: 9, fontSize: 13, color: "#166534", lineHeight: 1.6 }}>
-              <strong>When ready to reveal:</strong> click below to run the STV count and publish results. This is irreversible in practice — once results are out, people will have seen them.
+            <div style={{ marginTop: 16, padding: "12px 14px", background: "#eff6ff", border: "1px solid #93c5fd", borderRadius: 9, fontSize: 13, color: "#1d4ed8", lineHeight: 1.6 }}>
+              <strong>Recommended flow:</strong> first click "Preview Results" to see the full count privately. Only the admin sees this — voters still see "Closed." If the results look correct, click "Reveal Results" to publish publicly.
             </div>
-            <div style={{ marginTop: 10 }}>
-              <Btn onClick={revealResults} color="green">Reveal Results & Run Tally 🏆</Btn>
+            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button onClick={() => setResults(runSTV(liveBallots)) || setPreviewMode(true)} style={{
+                flex: 1, minWidth: 200, padding: "13px 20px",
+                borderRadius: 10, border: "1.5px solid #1d4ed8",
+                background: previewMode ? "#1d4ed8" : "white", color: previewMode ? "white" : "#1d4ed8",
+                fontSize: 14, fontWeight: 700, cursor: "pointer",
+              }}>
+                {previewMode ? "✓ Previewing (admin only)" : "👁 Preview Results (admin only)"}
+              </button>
+              <Btn onClick={revealResults} color="green" full={false}>Reveal Publicly 🏆</Btn>
             </div>
+            {previewMode && (
+              <div style={{ marginTop: 14, padding: "10px 14px", background: "#fef3c7", border: "1px solid #fcd34d", borderRadius: 9, fontSize: 12, color: "#92400e", lineHeight: 1.6 }}>
+                🔒 <strong>Preview mode is ON.</strong> The results below are visible ONLY to you (the admin). Voters on the public site still see "Voting closed — waiting for results." Click "Reveal Publicly" above to make results public.
+              </div>
+            )}
           </CardBody>
         </Card>
+      )}
+
+      {/* Admin preview — STVResults when phase is closed but admin has hit Preview */}
+      {livePhase === "closed" && previewMode && results && (
+        <>
+          <div style={{ padding: "12px 16px", background: "#eff6ff", border: "2px solid #1d4ed8", borderRadius: 10, marginBottom: 10, fontSize: 13, color: "#1e3a8a", lineHeight: 1.6, fontWeight: 600 }}>
+            👁 ADMIN PREVIEW — voters cannot see this yet. Review the results carefully before revealing publicly.
+          </div>
+          <STVResults results={results} ballots={liveBallots} />
+        </>
       )}
 
       {/* Results */}
