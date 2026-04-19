@@ -1635,7 +1635,7 @@ function AdminPage({ ctx }) {
                     {ranked.map(({ r, ci }) => (
                       <div key={r} style={{ display: "flex", alignItems: "center", gap: 4, background: RANK_LIGHT[r-1], border: `1px solid ${RANK_COLORS[r-1]}44`, borderRadius: 6, padding: "3px 9px" }}>
                         <div style={{ width: 20, height: 20, borderRadius: "50%", background: RANK_COLORS[r-1], display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "white", fontWeight: 800, flexShrink: 0 }}>{r}</div>
-                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{shortName(CANDIDATES[ci])}</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: "#374151" }}>{CANDIDATES[ci].split(" ")[0]}</span>
                       </div>
                     ))}
                   </div>
