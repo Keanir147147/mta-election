@@ -100,10 +100,7 @@ function genRandomBallots(nVoters, nCandidates, minRank = 2) {
   }
   return out
 }
-  const maxLosses = Math.max(...Object.values(losses))
-  const biggestLosers = tiedCis.filter(ci => losses[ci] === maxLosses)
-  return biggestLosers[biggestLosers.length - 1]
-}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // STV ENGINE
 // ─────────────────────────────────────────────────────────────────────────────
