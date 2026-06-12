@@ -100,35 +100,6 @@ function genRandomBallots(nVoters, nCandidates, minRank = 2) {
   }
   return out
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// TIE-BREAKING: Condorcet head-to-head method
-// ─────────────────────────────────────────────────────────────────────────────
-// When multiple candidates tie for fewest votes in an STV round, this helper
-// uses the Condorcet criterion: who do voters actually prefer in direct
-// head-to-head comparison? For each pair of tied candidates, we count how
-// many ballots ranked one higher than the other. The candidate who LOSES the
-// most head-to-head matchups against the others in the tie is eliminated.
-// This uses voters' real preferences, not arbitrary list order.
-// If still tied after head-to-head (rare), falls back to last in tied list.
-function condorcetLoser(tiedCis, ballots) {
-  if (tiedCis.length === 1) return tiedCis[0]
-  const losses = {}
-  for (const ci of tiedCis) {
-    losses[ci] = 0
-    for (const otherCi of tiedCis) {
-      if (ci === otherCi) continue
-      let otherWins = 0, ciWins = 0
-      for (const b of ballots) {
-        const ciRank = b[ci]
-        const otherRank = b[otherCi]
-        if (ciRank == null || otherRank == null) continue
-        if (otherRank < ciRank) otherWins++
-        else if (ciRank < otherRank) ciWins++
-      }
-      if (otherWins > ciWins) losses[ci]++
-    }
-  }
   const maxLosses = Math.max(...Object.values(losses))
   const biggestLosers = tiedCis.filter(ci => losses[ci] === maxLosses)
   return biggestLosers[biggestLosers.length - 1]
@@ -205,9 +176,6 @@ function runSTV(ballots, candidates = CANDIDATES) {
           if (earliestLowest !== null && tied.filter(ci => {
             const r = pastSnap.find(x => x.ci === ci); return r && r.votes === lowestVotes
           }).length === 1) { toElim = earliestLowest; resolvedByLookback = true; break }
-        }
-        if (!resolvedByLookback) {
-          toElim = condorcetLoser(tied, ballots)
         }
       }
       eliminated.add(toElim); actions.push({ type: "eliminated", ci: toElim })
