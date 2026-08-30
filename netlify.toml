@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # VITE_ADMIN_CODE is a client-side admin gate. Vite inlines VITE_-prefixed
+  # env vars into the bundle at build time, so its value legitimately appears
+  # in dist/. Exclude this key from Netlify's secrets scanner.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_ADMIN_CODE"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
