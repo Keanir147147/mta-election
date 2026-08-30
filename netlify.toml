@@ -2,6 +2,12 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  # VITE_ADMIN_CODE is intentionally inlined into the client bundle by Vite —
+  # it gates a client-side admin UI, not a server-side trust boundary. Exclude
+  # it from Netlify's secret scanner so the deploy isn't blocked.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_ADMIN_CODE"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
